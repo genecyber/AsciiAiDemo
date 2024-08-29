@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shape-Shifting 3D ASCII Dragon Tunnel</title>
+    <title>Smoky 3D ASCII Tunnel</title>
     <style>
         body {
             margin: 0;
@@ -15,6 +15,7 @@
             height: 100vh;
             font-family: monospace;
             perspective: 1000px;
+            overflow: hidden;
         }
         #scene {
             font-size: 10px;
@@ -58,41 +59,45 @@
         const complexityControl = document.getElementById('complexity');
         const depthControl = document.getElementById('depth');
 
-        const width = 120;
+        const width = 80;
         const height = 40;
         const baseDepth = 32;
-        const dragonChars = '§@%#*+=-:. ';
+        const smokeChars = '░▒▓█@#*+=:-. ';
         const fov = 90;
 
         let time = 0;
-        let embers = [];
+        let smokeParticles = [];
 
-        function createEmber() {
+        function createSmokeParticle() {
             return {
-                x: (Math.random() - 0.5) * width,
-                y: (Math.random() - 0.5) * height,
+                x: (Math.random() - 0.5) * width * 0.5,
+                y: (Math.random() - 0.5) * height * 0.5,
                 z: baseDepth,
-                color: `hsl(${Math.random() * 60 + 10}, 100%, 50%)`
+                opacity: Math.random() * 0.5 + 0.5,
+                size: Math.random() * 1.5 + 0.5
             };
         }
 
-        function initEmbers() {
-            for (let i = 0; i < 50; i++) {
-                embers.push(createEmber());
+        function initSmokeParticles() {
+            for (let i = 0; i < 150; i++) {
+                smokeParticles.push(createSmokeParticle());
             }
         }
 
-        function updateEmbers() {
+        function updateSmokeParticles() {
             const speed = speedControl.value / 5;
-            embers.forEach(ember => {
-                ember.z -= speed;
-                if (ember.z < 1) {
-                    Object.assign(ember, createEmber());
+            smokeParticles.forEach(particle => {
+                particle.z -= speed;
+                particle.y += (Math.random() - 0.5) * 0.3;
+                particle.x += (Math.random() - 0.5) * 0.3;
+                particle.opacity -= 0.005 * speed;
+                if (particle.z < 1 || particle.opacity <= 0) {
+                    Object.assign(particle, createSmokeParticle());
                 }
             });
         }
 
-        function dragonNoise(x, y, z, octaves) {
+        function smokeNoise(x, y, z, octaves) {
             let noise = 0;
             let frequency = 1;
             let amplitude = 1;
@@ -112,17 +117,14 @@
             return t * t * (3 - 2 * t);
         }
 
-        function dragonShape(angle, distance, timeOffset) {
-            const bodyPulse = Math.sin(time * 0.2 + timeOffset) * 0.2 + 0.8;
-            const neckStretch = Math.sin(angle * 2 + time * 0.3 + timeOffset) * 0.3 + 0.7;
-            const wingFlap = Math.sin(angle * 4 + time * 0.4 + timeOffset) * 0.4 * (1 - Math.abs(angle) / Math.PI);
-            const tailCurl = Math.sin(angle * 3 + time * 0.25 + timeOffset) * 0.2 + 0.8;
-
-            return (bodyPulse * neckStretch + wingFlap) * tailCurl;
+        function smokeShape(angle, distance, timeOffset) {
+            const smokeWave = Math.sin(angle * 2 + time * 0.3 + timeOffset) * 0.2 + 0.8;
+            const smokeDrift = Math.sin(distance * 0.1 + time * 0.2 + timeOffset) * 0.3 + 0.7;
+            return smokeWave * smokeDrift;
         }
 
         function generateScene() {
-            let scene = Array(height).fill().map(() => Array(width).fill({ char: ' ', color: 'black', luminosity: 0, z: 0 }));
+            let scene = Array(height).fill().map(() => Array(width).fill({ char: ' ', color: 'black', opacity: 0, z: 0 }));
             const complexity = complexityControl.value;
             const depthFactor = depthControl.value / 5;
             const depth = baseDepth * depthFactor;
@@ -134,53 +136,47 @@
                     const distance = Math.sqrt(dx * dx + dy * dy);
                     const angle = Math.atan2(dy, dx);
                     
-                    // Create dynamic dragon shape
-                    const shapeDistortion = dragonShape(angle, distance, time * 0.1);
+                    const shapeDistortion = smokeShape(angle, distance, time * 0.1);
                     const distortedDistance = distance * shapeDistortion;
 
-                    const noise = dragonNoise(dx / 20, dy / 20, time / 10, complexity);
+                    const noise = smokeNoise(dx / 10, dy / 10, time / 5, complexity);
                     const z = smoothStep(0, 1, (noise + 1) / 2) * depth;
                     const perspectiveFactor = Math.pow(Math.cos(distortedDistance / (width / 2) * Math.PI / 2), 2);
                     
-                    const brightness = smoothStep(0, 1, (1 - z / depth) * perspectiveFactor);
-                    const charIndex = Math.floor(brightness * (dragonChars.length - 1));
-                    const char = dragonChars[Math.max(0, Math.min(charIndex, dragonChars.length - 1))];
+                    const opacity = smoothStep(0, 1, (1 - z / depth) * perspectiveFactor) * 0.8;
+                    const charIndex = Math.floor(opacity * (smokeChars.length - 1));
+                    const char = smokeChars[Math.max(0, Math.min(charIndex, smokeChars.length - 1))];
 
                     const projectedX = Math.floor(width / 2 + dx * perspectiveFactor);
                     const projectedY = Math.floor(height / 2 + dy * perspectiveFactor);
 
                     if (projectedX >= 0 && projectedX < width && projectedY >= 0 && projectedY < height) {
-                        // Dynamic color based on dragon part
-                        const baseHue = (z / depth * 60 + 300) % 360;
-                        const hueShift = Math.sin(angle * 2 + time * 0.2) * 30;
-                        const hue = (baseHue + hueShift) % 360;
-                        const saturation = 70 + brightness * 30;
-                        const luminosity = 20 + brightness * 60;
+                        const grayValue = Math.floor(255 * (1 - opacity));
                         scene[projectedY][projectedX] = { 
                             char, 
-                            color: `hsl(${hue}, ${saturation}%, ${luminosity}%)`,
-                            luminosity: brightness,
+                            color: `rgb(${grayValue},${grayValue},${grayValue})`,
+                            opacity: opacity,
                             z: z
                         };
                     }
                 }
             }
 
-            // Draw embers
-            embers.forEach(ember => {
-                const perspectiveFactor = fov / (fov + ember.z);
-                const projectedX = Math.floor(width / 2 + ember.x * perspectiveFactor);
-                const projectedY = Math.floor(height / 2 + ember.y * perspectiveFactor);
+            // Draw smoke particles
+            smokeParticles.forEach(particle => {
+                const perspectiveFactor = fov / (fov + particle.z);
+                const projectedX = Math.floor(width / 2 + particle.x * perspectiveFactor);
+                const projectedY = Math.floor(height / 2 + particle.y * perspectiveFactor);
 
                 if (projectedX >= 0 && projectedX < width && projectedY >= 0 && projectedY < height) {
-                    const brightness = 1 - ember.z / depth;
-                    const emberChar = '•';
-                    const luminosity = brightness * 100;
+                    const opacity = particle.opacity * (1 - particle.z / depth);
+                    const grayValue = Math.floor(255 * (1 - opacity));
+                    const particleChar = '•';
                     scene[projectedY][projectedX] = { 
-                        char: emberChar, 
-                        color: ember.color,
-                        luminosity: brightness,
-                        z: ember.z
+                        char: particleChar, 
+                        color: `rgb(${grayValue},${grayValue},${grayValue})`,
+                        opacity: opacity,
+                        z: particle.z
                     };
                 }
             });
@@ -188,16 +184,16 @@
             return scene.map((row, y) => 
                 row.map((pixel, x) => {
                     const zOffset = pixel.z / 10;
-                    return `<span style="color:${pixel.color};text-shadow:0 0 ${pixel.luminosity * 5}px ${pixel.color};transform:translateZ(${zOffset}px)">${pixel.char}</span>`;
+                    return `<span style="color:${pixel.color};opacity:${pixel.opacity};transform:translateZ(${zOffset}px)">${pixel.char}</span>`;
                 }).join('')
             ).join('\n');
         }
 
         function updateScene() {
-            time += 0.1 * speedControl.value / 5;
-            updateEmbers();
+            time += 0.05 * speedControl.value / 5;
+            updateSmokeParticles();
             sceneElement.innerHTML = generateScene();
-            sceneElement.style.transform = `rotateX(${Math.sin(time * 0.1) * 5}deg) rotateY(${Math.cos(time * 0.1) * 5}deg)`;
+            sceneElement.style.transform = `rotateX(${Math.sin(time * 0.1) * 3}deg) rotateY(${Math.cos(time * 0.1) * 3}deg)`;
             requestAnimationFrame(updateScene);
         }
 
@@ -210,7 +206,7 @@
         complexityControl.addEventListener('input', () => {});
         depthControl.addEventListener('input', () => {});
 
-        initEmbers();
+        initSmokeParticles();
         updateZoom();
         updateScene();
     </script>

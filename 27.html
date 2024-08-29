@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flubber Kink ASCII Tunnel</title>
+    <title>Shape-Shifting 3D ASCII Dragon Tunnel</title>
     <style>
         body {
             margin: 0;
@@ -15,7 +15,6 @@
             height: 100vh;
             font-family: monospace;
             perspective: 1000px;
-            overflow: hidden;
         }
         #scene {
             font-size: 10px;
@@ -48,8 +47,8 @@
             <input type="range" id="complexity" min="1" max="5" value="3" step="1">
         </div>
         <div>
-            <label for="elasticity">Elasticity:</label>
-            <input type="range" id="elasticity" min="1" max="10" value="5" step="1">
+            <label for="depth">Depth:</label>
+            <input type="range" id="depth" min="1" max="10" value="5" step="1">
         </div>
     </div>
     <script>
@@ -57,49 +56,43 @@
         const zoomControl = document.getElementById('zoom');
         const speedControl = document.getElementById('speed');
         const complexityControl = document.getElementById('complexity');
-        const elasticityControl = document.getElementById('elasticity');
+        const depthControl = document.getElementById('depth');
 
-        const width = 80;
+        const width = 120;
         const height = 40;
         const baseDepth = 32;
-        const flubberChars = '▓▒░○◌◯◦.·:·. ';
+        const dragonChars = '§@%#*+=-:. ';
         const fov = 90;
 
         let time = 0;
-        let flubberParticles = [];
+        let embers = [];
 
-        function createFlubberParticle() {
+        function createEmber() {
             return {
                 x: (Math.random() - 0.5) * width,
                 y: (Math.random() - 0.5) * height,
                 z: baseDepth,
-                opacity: Math.random() * 0.7 + 0.3,
-                size: Math.random() * 1.5 + 0.5,
-                hue: Math.random() * 60 + 120 // Green to blue hues
+                color: `hsl(${Math.random() * 60 + 10}, 100%, 50%)`
             };
         }
 
-        function initParticles() {
-            for (let i = 0; i < 300; i++) {
-                flubberParticles.push(createFlubberParticle());
+        function initEmbers() {
+            for (let i = 0; i < 50; i++) {
+                embers.push(createEmber());
             }
         }
 
-        function updateParticles() {
+        function updateEmbers() {
             const speed = speedControl.value / 5;
-            const elasticity = elasticityControl.value / 5;
-            flubberParticles.forEach(particle => {
-                particle.z -= speed;
-                particle.x += Math.sin(time * elasticity + particle.y) * 0.5;
-                particle.y += Math.cos(time * elasticity + particle.x) * 0.5;
-                particle.opacity -= 0.005 * speed;
-                if (particle.z < 1 || particle.opacity <= 0) {
-                    Object.assign(particle, createFlubberParticle());
+            embers.forEach(ember => {
+                ember.z -= speed;
+                if (ember.z < 1) {
+                    Object.assign(ember, createEmber());
                 }
             });
         }
 
-        function flubberNoise(x, y, z, octaves) {
+        function dragonNoise(x, y, z, octaves) {
             let noise = 0;
             let frequency = 1;
             let amplitude = 1;
@@ -119,54 +112,75 @@
             return t * t * (3 - 2 * t);
         }
 
-        function generateScene() {
-            let scene = Array(height).fill().map(() => Array(width).fill({ char: ' ', color: 'black', opacity: 0, z: 0 }));
-            const complexity = complexityControl.value;
-            const elasticity = elasticityControl.value / 5;
-            const depth = baseDepth;
+        function dragonShape(angle, distance, timeOffset) {
+            const bodyPulse = Math.sin(time * 0.2 + timeOffset) * 0.2 + 0.8;
+            const neckStretch = Math.sin(angle * 2 + time * 0.3 + timeOffset) * 0.3 + 0.7;
+            const wingFlap = Math.sin(angle * 4 + time * 0.4 + timeOffset) * 0.4 * (1 - Math.abs(angle) / Math.PI);
+            const tailCurl = Math.sin(angle * 3 + time * 0.25 + timeOffset) * 0.2 + 0.8;
 
-            // Generate flubber background
+            return (bodyPulse * neckStretch + wingFlap) * tailCurl;
+        }
+
+        function generateScene() {
+            let scene = Array(height).fill().map(() => Array(width).fill({ char: ' ', color: 'black', luminosity: 0, z: 0 }));
+            const complexity = complexityControl.value;
+            const depthFactor = depthControl.value / 5;
+            const depth = baseDepth * depthFactor;
+
             for (let x = 0; x < width; x++) {
                 for (let y = 0; y < height; y++) {
                     const dx = x - width / 2;
                     const dy = y - height / 2;
                     const distance = Math.sqrt(dx * dx + dy * dy);
+                    const angle = Math.atan2(dy, dx);
                     
-                    const noise = flubberNoise(dx / 10, dy / 10, time / 5, complexity);
+                    // Create dynamic dragon shape
+                    const shapeDistortion = dragonShape(angle, distance, time * 0.1);
+                    const distortedDistance = distance * shapeDistortion;
+
+                    const noise = dragonNoise(dx / 20, dy / 20, time / 10, complexity);
                     const z = smoothStep(0, 1, (noise + 1) / 2) * depth;
-                    const perspectiveFactor = Math.pow(Math.cos(distance / (width / 2) * Math.PI / 2), 2);
+                    const perspectiveFactor = Math.pow(Math.cos(distortedDistance / (width / 2) * Math.PI / 2), 2);
                     
-                    const opacity = smoothStep(0, 1, (1 - z / depth) * perspectiveFactor) * 0.8;
-                    const charIndex = Math.floor(opacity * (flubberChars.length - 1));
-                    const char = flubberChars[Math.max(0, Math.min(charIndex, flubberChars.length - 1))];
+                    const brightness = smoothStep(0, 1, (1 - z / depth) * perspectiveFactor);
+                    const charIndex = Math.floor(brightness * (dragonChars.length - 1));
+                    const char = dragonChars[Math.max(0, Math.min(charIndex, dragonChars.length - 1))];
 
-                    const hue = (z / depth * 60 + 120) % 360; // Green to blue gradient
-                    const saturation = 70 + opacity * 30;
-                    const lightness = 20 + opacity * 60;
+                    const projectedX = Math.floor(width / 2 + dx * perspectiveFactor);
+                    const projectedY = Math.floor(height / 2 + dy * perspectiveFactor);
 
-                    scene[y][x] = { 
-                        char, 
-                        color: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
-                        opacity: opacity,
-                        z: z
-                    };
+                    if (projectedX >= 0 && projectedX < width && projectedY >= 0 && projectedY < height) {
+                        // Dynamic color based on dragon part
+                        const baseHue = (z / depth * 60 + 300) % 360;
+                        const hueShift = Math.sin(angle * 2 + time * 0.2) * 30;
+                        const hue = (baseHue + hueShift) % 360;
+                        const saturation = 70 + brightness * 30;
+                        const luminosity = 20 + brightness * 60;
+                        scene[projectedY][projectedX] = { 
+                            char, 
+                            color: `hsl(${hue}, ${saturation}%, ${luminosity}%)`,
+                            luminosity: brightness,
+                            z: z
+                        };
+                    }
                 }
             }
 
-            // Draw flubber particles
-            flubberParticles.forEach(particle => {
-                const perspectiveFactor = fov / (fov + particle.z);
-                const projectedX = Math.floor(width / 2 + particle.x * perspectiveFactor);
-                const projectedY = Math.floor(height / 2 + particle.y * perspectiveFactor);
+            // Draw embers
+            embers.forEach(ember => {
+                const perspectiveFactor = fov / (fov + ember.z);
+                const projectedX = Math.floor(width / 2 + ember.x * perspectiveFactor);
+                const projectedY = Math.floor(height / 2 + ember.y * perspectiveFactor);
 
                 if (projectedX >= 0 && projectedX < width && projectedY >= 0 && projectedY < height) {
-                    const opacity = particle.opacity * (1 - particle.z / depth);
-                    const particleChar = '○';
+                    const brightness = 1 - ember.z / depth;
+                    const emberChar = '•';
+                    const luminosity = brightness * 100;
                     scene[projectedY][projectedX] = { 
-                        char: particleChar, 
-                        color: `hsl(${particle.hue}, 100%, 70%)`,
-                        opacity: opacity,
-                        z: particle.z
+                        char: emberChar, 
+                        color: ember.color,
+                        luminosity: brightness,
+                        z: ember.z
                     };
                 }
             });
@@ -174,16 +188,16 @@
             return scene.map((row, y) => 
                 row.map((pixel, x) => {
                     const zOffset = pixel.z / 10;
-                    return `<span style="color:${pixel.color};opacity:${pixel.opacity};transform:translateZ(${zOffset}px)">${pixel.char}</span>`;
+                    return `<span style="color:${pixel.color};text-shadow:0 0 ${pixel.luminosity * 5}px ${pixel.color};transform:translateZ(${zOffset}px)">${pixel.char}</span>`;
                 }).join('')
             ).join('\n');
         }
 
         function updateScene() {
-            time += 0.05 * speedControl.value / 5;
-            updateParticles();
+            time += 0.1 * speedControl.value / 5;
+            updateEmbers();
             sceneElement.innerHTML = generateScene();
-            sceneElement.style.transform = `rotateX(${Math.sin(time * 0.1) * 3}deg) rotateY(${Math.cos(time * 0.1) * 3}deg)`;
+            sceneElement.style.transform = `rotateX(${Math.sin(time * 0.1) * 5}deg) rotateY(${Math.cos(time * 0.1) * 5}deg)`;
             requestAnimationFrame(updateScene);
         }
 
@@ -194,9 +208,9 @@
         zoomControl.addEventListener('input', updateZoom);
         speedControl.addEventListener('input', () => {});
         complexityControl.addEventListener('input', () => {});
-        elasticityControl.addEventListener('input', () => {});
+        depthControl.addEventListener('input', () => {});
 
-        initParticles();
+        initEmbers();
         updateZoom();
         updateScene();
     </script>

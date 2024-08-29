@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fiery 3D ASCII Dragon Tunnel</title>
+    <title>Eternal Underwater Flames with Smoke ASCII Tunnel</title>
     <style>
         body {
             margin: 0;
@@ -48,8 +48,8 @@
             <input type="range" id="complexity" min="1" max="5" value="3" step="1">
         </div>
         <div>
-            <label for="depth">Depth:</label>
-            <input type="range" id="depth" min="1" max="10" value="5" step="1">
+            <label for="buoyancy">Buoyancy:</label>
+            <input type="range" id="buoyancy" min="1" max="10" value="5" step="1">
         </div>
     </div>
     <script>
@@ -57,53 +57,89 @@
         const zoomControl = document.getElementById('zoom');
         const speedControl = document.getElementById('speed');
         const complexityControl = document.getElementById('complexity');
-        const depthControl = document.getElementById('depth');
+        const buoyancyControl = document.getElementById('buoyancy');
 
-        const width = 120;
+        const width = 80;
         const height = 40;
         const baseDepth = 32;
-        const fireChars = '🔥@#*+=:-. ';
+        const flameChars = '▓▒░○◌◯◦.·:·. ';
+        const smokeChars = '▓▒░○◌◯◦.·:·. ';
         const fov = 90;
 
         let time = 0;
-        let embers = [];
+        let flameParticles = [];
+        let smokeParticles = [];
 
-        function createEmber() {
+        function createFlameParticle() {
             return {
                 x: (Math.random() - 0.5) * width,
-                y: (Math.random() - 0.5) * height,
-                z: baseDepth,
-                color: `hsl(${Math.random() * 60 + 10}, 100%, 50%)`,
-                size: Math.random() * 2 + 1
+                y: height + Math.random() * height / 2,
+                z: Math.random() * baseDepth,
+                opacity: Math.random() * 0.7 + 0.3,
+                size: Math.random() * 1.5 + 0.5,
+                hue: Math.random() * 60 + 10 // Red to yellow hues
             };
         }
 
-        function initEmbers() {
+        function createSmokeParticle(x, y, z) {
+            return {
+                x: x,
+                y: y,
+                z: z,
+                opacity: Math.random() * 0.3 + 0.1,
+                size: Math.random() * 1.5 + 0.5,
+                vx: (Math.random() - 0.5) * 0.2,
+                vy: -Math.random() * 0.5 - 0.1
+            };
+        }
+
+        function initParticles() {
+            for (let i = 0; i < 300; i++) {
+                flameParticles.push(createFlameParticle());
+            }
             for (let i = 0; i < 100; i++) {
-                embers.push(createEmber());
+                smokeParticles.push(createSmokeParticle(
+                    (Math.random() - 0.5) * width,
+                    height + Math.random() * height / 2,
+                    Math.random() * baseDepth
+                ));
             }
         }
 
-        function updateEmbers() {
+        function updateParticles() {
             const speed = speedControl.value / 5;
-            embers.forEach(ember => {
-                ember.z -= speed * 1.5;
-                ember.y += (Math.random() - 0.5) * 0.5;
-                ember.x += (Math.random() - 0.5) * 0.5;
-                if (ember.z < 1) {
-                    Object.assign(ember, createEmber());
+            const buoyancy = buoyancyControl.value / 10;
+            
+            flameParticles.forEach(particle => {
+                particle.y -= buoyancy;
+                particle.x += Math.sin(time * 0.1 + particle.y * 0.1) * 0.2;
+                particle.opacity -= 0.005 * speed;
+                if (particle.y < -height / 2 || particle.opacity <= 0) {
+                    Object.assign(particle, createFlameParticle());
+                }
+                if (Math.random() < 0.05) {
+                    smokeParticles.push(createSmokeParticle(particle.x, particle.y, particle.z));
+                }
+            });
+
+            smokeParticles.forEach((particle, index) => {
+                particle.x += particle.vx;
+                particle.y += particle.vy;
+                particle.opacity -= 0.002 * speed;
+                if (particle.y < -height / 2 || particle.opacity <= 0) {
+                    smokeParticles.splice(index, 1);
                 }
             });
         }
 
-        function fireNoise(x, y, z, octaves) {
+        function flameNoise(x, y, z, octaves) {
             let noise = 0;
             let frequency = 1;
             let amplitude = 1;
             let maxValue = 0;
             for (let i = 0; i < octaves; i++) {
-                noise += (Math.sin(x * frequency + time * 2) * Math.cos(y * frequency + time * 2) * Math.sin(z * frequency + time * 2) +
-                          Math.sin(x * frequency * 1.5 + time * 2.2) * Math.cos(y * frequency * 1.5 + time * 2.2) * Math.sin(z * frequency * 1.5 + time * 2.2)) * amplitude;
+                noise += (Math.sin(x * frequency + time) * Math.cos(y * frequency + time) * Math.sin(z * frequency + time) +
+                          Math.sin(x * frequency * 1.5 + time * 1.1) * Math.cos(y * frequency * 1.5 + time * 1.1) * Math.sin(z * frequency * 1.5 + time * 1.1)) * amplitude;
                 maxValue += amplitude;
                 amplitude *= 0.5;
                 frequency *= 2;
@@ -116,69 +152,49 @@
             return t * t * (3 - 2 * t);
         }
 
-        function fireShape(angle, distance, timeOffset) {
-            const flameFlicker = Math.sin(time * 0.5 + timeOffset) * 0.3 + 0.7;
-            const flameWave = Math.sin(angle * 4 + time * 0.6 + timeOffset) * 0.2 + 0.8;
-            const flameTip = Math.pow(1 - Math.abs(angle) / Math.PI, 2) * 0.5 + 0.5;
-            return flameFlicker * flameWave * flameTip;
-        }
-
         function generateScene() {
-            let scene = Array(height).fill().map(() => Array(width).fill({ char: ' ', color: 'black', luminosity: 0, z: 0 }));
+            let scene = Array(height).fill().map(() => Array(width).fill({ char: ' ', color: 'black', opacity: 0, z: 0 }));
             const complexity = complexityControl.value;
-            const depthFactor = depthControl.value / 5;
-            const depth = baseDepth * depthFactor;
+            const depth = baseDepth;
 
-            for (let x = 0; x < width; x++) {
-                for (let y = 0; y < height; y++) {
-                    const dx = x - width / 2;
-                    const dy = y - height / 2;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    const angle = Math.atan2(dy, dx);
-                    
-                    const shapeDistortion = fireShape(angle, distance, time * 0.2);
-                    const distortedDistance = distance * shapeDistortion;
-
-                    const noise = fireNoise(dx / 15, dy / 15, time / 5, complexity);
-                    const z = smoothStep(0, 1, (noise + 1) / 2) * depth;
-                    const perspectiveFactor = Math.pow(Math.cos(distortedDistance / (width / 2) * Math.PI / 2), 2);
-                    
-                    const brightness = smoothStep(0, 1, (1 - z / depth) * perspectiveFactor);
-                    const charIndex = Math.floor(brightness * (fireChars.length - 1));
-                    const char = fireChars[Math.max(0, Math.min(charIndex, fireChars.length - 1))];
-
-                    const projectedX = Math.floor(width / 2 + dx * perspectiveFactor);
-                    const projectedY = Math.floor(height / 2 + dy * perspectiveFactor);
-
-                    if (projectedX >= 0 && projectedX < width && projectedY >= 0 && projectedY < height) {
-                        const hue = 30 - brightness * 30;
-                        const saturation = 100;
-                        const luminosity = 50 + brightness * 50;
-                        scene[projectedY][projectedX] = { 
-                            char, 
-                            color: `hsl(${hue}, ${saturation}%, ${luminosity}%)`,
-                            luminosity: brightness,
-                            z: z
-                        };
-                    }
-                }
-            }
-
-            // Draw embers
-            embers.forEach(ember => {
-                const perspectiveFactor = fov / (fov + ember.z);
-                const projectedX = Math.floor(width / 2 + ember.x * perspectiveFactor);
-                const projectedY = Math.floor(height / 2 + ember.y * perspectiveFactor);
+            // Draw flame particles
+            flameParticles.forEach(particle => {
+                const perspectiveFactor = fov / (fov + particle.z);
+                const projectedX = Math.floor(width / 2 + particle.x * perspectiveFactor);
+                const projectedY = Math.floor(height / 2 + particle.y * perspectiveFactor);
 
                 if (projectedX >= 0 && projectedX < width && projectedY >= 0 && projectedY < height) {
-                    const brightness = 1 - ember.z / depth;
-                    const emberChar = '•';
-                    const luminosity = brightness * 100;
+                    const opacity = particle.opacity * (1 - particle.z / depth);
+                    const particleChar = '○';
+                    const hue = particle.hue;
+                    const saturation = 100;
+                    const lightness = 70;
+
                     scene[projectedY][projectedX] = { 
-                        char: emberChar, 
-                        color: ember.color,
-                        luminosity: brightness,
-                        z: ember.z
+                        char: particleChar, 
+                        color: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+                        opacity: opacity,
+                        z: particle.z
+                    };
+                }
+            });
+
+            // Draw smoke particles
+            smokeParticles.forEach(particle => {
+                const perspectiveFactor = fov / (fov + particle.z);
+                const projectedX = Math.floor(width / 2 + particle.x * perspectiveFactor);
+                const projectedY = Math.floor(height / 2 + particle.y * perspectiveFactor);
+
+                if (projectedX >= 0 && projectedX < width && projectedY >= 0 && projectedY < height) {
+                    const opacity = particle.opacity * (1 - particle.z / depth);
+                    const particleChar = smokeChars[Math.floor(Math.random() * smokeChars.length)];
+                    const lightness = 50 + Math.random() * 20;
+
+                    scene[projectedY][projectedX] = { 
+                        char: particleChar, 
+                        color: `hsl(0, 0%, ${lightness}%)`,
+                        opacity: opacity,
+                        z: particle.z
                     };
                 }
             });
@@ -186,16 +202,16 @@
             return scene.map((row, y) => 
                 row.map((pixel, x) => {
                     const zOffset = pixel.z / 10;
-                    return `<span style="color:${pixel.color};text-shadow:0 0 ${pixel.luminosity * 5}px ${pixel.color};transform:translateZ(${zOffset}px)">${pixel.char}</span>`;
+                    return `<span style="color:${pixel.color};opacity:${pixel.opacity};transform:translateZ(${zOffset}px)">${pixel.char}</span>`;
                 }).join('')
             ).join('\n');
         }
 
         function updateScene() {
-            time += 0.1 * speedControl.value / 5;
-            updateEmbers();
+            time += 0.05 * speedControl.value / 5;
+            updateParticles();
             sceneElement.innerHTML = generateScene();
-            sceneElement.style.transform = `rotateX(${Math.sin(time * 0.1) * 5}deg) rotateY(${Math.cos(time * 0.1) * 5}deg)`;
+            sceneElement.style.transform = `rotateX(${Math.sin(time * 0.1) * 3}deg) rotateY(${Math.cos(time * 0.1) * 3}deg)`;
             requestAnimationFrame(updateScene);
         }
 
@@ -206,9 +222,9 @@
         zoomControl.addEventListener('input', updateZoom);
         speedControl.addEventListener('input', () => {});
         complexityControl.addEventListener('input', () => {});
-        depthControl.addEventListener('input', () => {});
+        buoyancyControl.addEventListener('input', () => {});
 
-        initEmbers();
+        initParticles();
         updateZoom();
         updateScene();
     </script>
