@@ -97,7 +97,7 @@
         '25.html',
         '26.html',
     ];
-    let currentIndex = 0;
+    let currentIndex = 1;
 
     const iframe = document.getElementById('animation-container');
     const prevBtn = document.getElementById('prev-btn');
@@ -105,26 +105,33 @@
     const selectElement = document.getElementById('animation-select');
 
     function loadAnimation(index) {
-        iframe.src = animations[index];
-        selectElement.selectedIndex = index;
+        iframe.src = animations[index - 1];
+        selectElement.selectedIndex = index - 1;
+        updateURL(index);
     }
 
     function updateButtons() {
-        prevBtn.style.visibility = currentIndex > 0 ? 'visible' : 'hidden';
-        nextBtn.style.visibility = currentIndex < animations.length - 1 ? 'visible' : 'hidden';
+        prevBtn.style.visibility = currentIndex > 1 ? 'visible' : 'hidden';
+        nextBtn.style.visibility = currentIndex < animations.length ? 'visible' : 'hidden';
+    }
+
+    function updateURL(index) {
+        const url = new URL(window.location);
+        url.searchParams.set('animation', index);
+        window.history.pushState({}, '', url);
     }
 
     // Populate select element
     animations.forEach((animation, index) => {
         const option = document.createElement('option');
-        option.value = index;
+        option.value = index + 1;
         option.textContent = `Animation ${index + 1}`;
         selectElement.appendChild(option);
     });
 
     prevBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        if (currentIndex > 0) {
+        if (currentIndex > 1) {
             currentIndex--;
             loadAnimation(currentIndex);
             updateButtons();
@@ -133,7 +140,7 @@
 
     nextBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        if (currentIndex < animations.length - 1) {
+        if (currentIndex < animations.length) {
             currentIndex++;
             loadAnimation(currentIndex);
             updateButtons();
@@ -146,7 +153,14 @@
         updateButtons();
     });
 
-    // Load the first animation
+    // Check for animation parameter in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const animationParam = urlParams.get('animation');
+    if (animationParam !== null && !isNaN(animationParam)) {
+        currentIndex = Math.min(Math.max(1, parseInt(animationParam)), animations.length);
+    }
+
+    // Load the animation
     loadAnimation(currentIndex);
     updateButtons();
 </script>
