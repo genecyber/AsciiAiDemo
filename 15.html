@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Sine Wave Visualizer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+            overflow: hidden;
+        }
+        #scene {
+            font-size: 10px;
+            line-height: 1;
+            white-space: pre;
+            color: #FFFFFF;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            gap: 20px;
+            color: #FFFFFF;
+        }
+        #startButton {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div id="scene"></div>
+    <div id="controls">
+        <div>
+            <label for="zoom">Zoom:</label>
+            <input type="range" id="zoom" min="6" max="16" value="10" step="1">
+        </div>
+        <div>
+            <label for="frequency">Frequency:</label>
+            <input type="range" id="frequency" min="20" max="1000" value="440" step="1">
+        </div>
+        <button id="startButton">Start Sound</button>
+    </div>
+    <script>
+        const sceneElement = document.getElementById('scene');
+        const zoomControl = document.getElementById('zoom');
+        const frequencyControl = document.getElementById('frequency');
+        const startButton = document.getElementById('startButton');
+
+        const width = 80;
+        const height = 24;
+
+        let audioContext;
+        let oscillator;
+        let analyser;
+        let dataArray;
+        let isVisualizationRunning = false;
+
+        function setupAudio() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            oscillator = audioContext.createOscillator();
+            analyser = audioContext.createAnalyser();
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
+            oscillator.connect(analyser);
+            analyser.connect(audioContext.destination);
+            
+            analyser.fftSize = 2048;
+            const bufferLength = analyser.frequencyBinCount;
+            dataArray = new Uint8Array(bufferLength);
+        }
+
+        function generateScene() {
+            if (!isVisualizationRunning) return '';
+
+            analyser.getByteTimeDomainData(dataArray);
+
+            const output = new Array(height).fill().map(() => new Array(width).fill(' '));
+            const asciiChars = ' .:-=+*#%@'.split('');
+
+            for (let x = 0; x < width; x++) {
+                const dataIndex = Math.floor((x / width) * dataArray.length);
+                const value = ((dataArray[dataIndex] / 128.0) - 1);
+                const y = Math.floor((height / 2) + (value * height / 2));
+
+                if (y >= 0 && y < height) {
+                    const charIndex = Math.floor(Math.abs(value) * (asciiChars.length - 1));
+                    output[y][x] = asciiChars[charIndex];
+                }
+            }
+
+            return output.map(row => row.join('')).join('\n');
+        }
+
+        function updateScene() {
+            sceneElement.textContent = generateScene();
+            requestAnimationFrame(updateScene);
+        }
+
+        function updateZoom() {
+            sceneElement.style.fontSize = `${zoomControl.value}px`;
+        }
+
+        function updateFrequency() {
+            if (oscillator) {
+                oscillator.frequency.setValueAtTime(frequencyControl.value, audioContext.currentTime);
+            }
+        }
+
+        zoomControl.addEventListener('input', updateZoom);
+        frequencyControl.addEventListener('input', updateFrequency);
+
+        startButton.addEventListener('click', () => {
+            if (!audioContext) {
+                setupAudio();
+                oscillator.start();
+                isVisualizationRunning = true;
+                startButton.textContent = 'Stop Sound';
+            } else if (audioContext.state === 'suspended') {
+                audioContext.resume();
+                isVisualizationRunning = true;
+                startButton.textContent = 'Stop Sound';
+            } else if (audioContext.state === 'running') {
+                audioContext.suspend();
+                isVisualizationRunning = false;
+                startButton.textContent = 'Start Sound';
+            }
+        });
+
+        // Setup
+        document.addEventListener('DOMContentLoaded', () => {
+            updateZoom();
+            updateScene();
+        });
+    </script>
+</body>
+</html>

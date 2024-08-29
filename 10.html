@@ -1,0 +1,119 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Thermal Imaging of a Flame</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+            overflow: hidden;
+        }
+        #scene {
+            font-size: 10px;
+            line-height: 1;
+            white-space: pre;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            gap: 20px;
+            color: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div id="scene"></div>
+    <div id="controls">
+        <div>
+            <label for="zoom">Zoom:</label>
+            <input type="range" id="zoom" min="6" max="16" value="10" step="1">
+        </div>
+        <div>
+            <label for="intensity">Intensity:</label>
+            <input type="range" id="intensity" min="1" max="10" value="5" step="1">
+        </div>
+        <div>
+            <label for="wind">Wind:</label>
+            <input type="range" id="wind" min="0" max="10" value="2" step="1">
+        </div>
+    </div>
+    <script>
+        const sceneElement = document.getElementById('scene');
+        const zoomControl = document.getElementById('zoom');
+        const intensityControl = document.getElementById('intensity');
+        const windControl = document.getElementById('wind');
+
+        const width = 60;
+        const height = 40;
+        const thermalChars = ' .:-=+*#%@';
+
+        let time = 0;
+
+        function noise(x, y, t) {
+            return Math.sin(x * 0.1 + t) * Math.cos(y * 0.1 - t) * Math.sin(t);
+        }
+
+        function flameSeed(x, y, t) {
+            return (noise(x * 2, y * 2, t * 0.5) + 1) / 2;
+        }
+
+        function generateScene() {
+            const intensity = intensityControl.value / 5;
+            const wind = windControl.value / 10;
+            let scene = Array(height).fill().map(() => Array(width).fill(0));
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const normalizedX = (x - width / 2) / (width / 2);
+                    const normalizedY = (height - y) / height;
+                    
+                    const flameBase = Math.max(0, 1 - Math.abs(normalizedX) * 2);
+                    const flameShape = Math.pow(normalizedY, 0.5) * flameBase;
+                    
+                    const windEffect = Math.sin(y * 0.2 + time) * wind * normalizedY;
+                    const turbulence = flameSeed(x + windEffect * 10, y - time * 10, time) * 0.3;
+                    
+                    const flameIntensity = Math.max(0, Math.min(1, flameShape + turbulence - 0.1));
+                    scene[y][x] = flameIntensity * intensity;
+                }
+            }
+
+            return scene.map(row => 
+                row.map(intensity => {
+                    const charIndex = Math.floor(intensity * (thermalChars.length - 1));
+                    const char = thermalChars[charIndex];
+                    const hue = 60 - intensity * 60; // Yellow to red
+                    const saturation = 100;
+                    const lightness = Math.min(100, 50 + intensity * 50); // Brighter at the center
+                    return `<span style="color:hsl(${hue},${saturation}%,${lightness}%)">${char}</span>`;
+                }).join('')
+            ).join('\n');
+        }
+
+        function updateScene() {
+            time += 0.1;
+            sceneElement.innerHTML = generateScene();
+            requestAnimationFrame(updateScene);
+        }
+
+        function updateZoom() {
+            sceneElement.style.fontSize = `${zoomControl.value}px`;
+        }
+
+        zoomControl.addEventListener('input', updateZoom);
+        intensityControl.addEventListener('input', () => {});
+        windControl.addEventListener('input', () => {});
+
+        updateZoom();
+        updateScene();
+    </script>
+</body>
+</html>

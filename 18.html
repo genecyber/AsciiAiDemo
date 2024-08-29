@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luminous 3D ASCII Wormhole Travel</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+        }
+        #scene {
+            font-size: 10px;
+            line-height: 1;
+            white-space: pre;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            gap: 20px;
+            color: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div id="scene"></div>
+    <div id="controls">
+        <div>
+            <label for="zoom">Zoom:</label>
+            <input type="range" id="zoom" min="6" max="16" value="10" step="1">
+        </div>
+        <div>
+            <label for="speed">Speed:</label>
+            <input type="range" id="speed" min="1" max="10" value="5" step="1">
+        </div>
+    </div>
+    <script>
+        const sceneElement = document.getElementById('scene');
+        const zoomControl = document.getElementById('zoom');
+        const speedControl = document.getElementById('speed');
+
+        const width = 120;
+        const height = 40;
+        const depth = 32;
+        const wormholeChars = ' .:-=+*#%@';
+        const fov = 90;
+
+        let time = 0;
+        let stars = [];
+
+        function createStar() {
+            return {
+                x: (Math.random() - 0.5) * width,
+                y: (Math.random() - 0.5) * height,
+                z: depth,
+                color: `hsl(${Math.random() * 360}, 100%, 50%)`
+            };
+        }
+
+        function initStars() {
+            for (let i = 0; i < 100; i++) {
+                stars.push(createStar());
+            }
+        }
+
+        function updateStars() {
+            const speed = speedControl.value / 5;
+            stars.forEach(star => {
+                star.z -= speed;
+                if (star.z < 1) {
+                    Object.assign(star, createStar());
+                }
+            });
+        }
+
+        function generateScene() {
+            let scene = Array(height).fill().map(() => Array(width).fill({ char: ' ', color: 'black', luminosity: 0 }));
+
+            // Draw wormhole
+            for (let x = 0; x < width; x++) {
+                for (let y = 0; y < height; y++) {
+                    const dx = x - width / 2;
+                    const dy = y - height / 2;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const angle = Math.atan2(dy, dx);
+                    const perspectiveFactor = Math.cos(distance / (width / 2) * Math.PI / 2);
+                    const z = (Math.sin(distance / 10 + time) + 1) * depth / 2;
+                    const distortedAngle = angle + Math.sin(z / depth * Math.PI * 2 + time) * 0.5;
+                    const distortedDistance = distance + Math.cos(z / depth * Math.PI * 4 + time) * 10;
+
+                    const brightness = (1 - z / depth) * perspectiveFactor;
+                    const charIndex = Math.floor(brightness * (wormholeChars.length - 1));
+                    const char = wormholeChars[Math.max(0, Math.min(charIndex, wormholeChars.length - 1))];
+
+                    const projectedX = Math.floor(width / 2 + Math.cos(distortedAngle) * distortedDistance * perspectiveFactor);
+                    const projectedY = Math.floor(height / 2 + Math.sin(distortedAngle) * distortedDistance * perspectiveFactor);
+
+                    if (projectedX >= 0 && projectedX < width && projectedY >= 0 && projectedY < height) {
+                        const hue = (z / depth * 360 + time * 20) % 360;
+                        const luminosity = brightness * 100;
+                        scene[projectedY][projectedX] = { 
+                            char, 
+                            color: `hsl(${hue}, 100%, ${luminosity}%)`,
+                            luminosity: brightness
+                        };
+                    }
+                }
+            }
+
+            // Draw stars
+            stars.forEach(star => {
+                const perspectiveFactor = fov / (fov + star.z);
+                const projectedX = Math.floor(width / 2 + star.x * perspectiveFactor);
+                const projectedY = Math.floor(height / 2 + star.y * perspectiveFactor);
+                
+                if (projectedX >= 0 && projectedX < width && projectedY >= 0 && projectedY < height) {
+                    const brightness = 1 - star.z / depth;
+                    const starChar = brightness > 0.6 ? '*' : '.';
+                    const luminosity = brightness * 100;
+                    scene[projectedY][projectedX] = { 
+                        char: starChar, 
+                        color: star.color,
+                        luminosity: brightness
+                    };
+                }
+            });
+
+            return scene.map(row => 
+                row.map(pixel => 
+                    `<span style="color:${pixel.color};text-shadow:0 0 ${pixel.luminosity * 5}px ${pixel.color}">${pixel.char}</span>`
+                ).join('')
+            ).join('\n');
+        }
+
+        function updateScene() {
+            time += 0.1 * speedControl.value / 5;
+            updateStars();
+            sceneElement.innerHTML = generateScene();
+            requestAnimationFrame(updateScene);
+        }
+
+        function updateZoom() {
+            sceneElement.style.fontSize = `${zoomControl.value}px`;
+        }
+
+        zoomControl.addEventListener('input', updateZoom);
+        speedControl.addEventListener('input', () => {});
+
+        initStars();
+        updateZoom();
+        updateScene();
+    </script>
+</body>
+</html>

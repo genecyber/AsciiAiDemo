@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Fusion Visualizer with Colored Fireworks</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+            overflow: hidden;
+        }
+        #scene {
+            font-size: 10px;
+            line-height: 1;
+            white-space: pre;
+            color: #FFFFFF;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            gap: 20px;
+            color: #FFFFFF;
+        }
+        .firework {
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div id="scene"></div>
+    <div id="controls">
+        <div>
+            <label for="zoom">Zoom:</label>
+            <input type="range" id="zoom" min="6" max="16" value="10" step="1">
+        </div>
+        <div>
+            <label for="speed">Speed:</label>
+            <input type="range" id="speed" min="1" max="10" value="5" step="1">
+        </div>
+    </div>
+    <script>
+        const sceneElement = document.getElementById('scene');
+        const zoomControl = document.getElementById('zoom');
+        const speedControl = document.getElementById('speed');
+
+        const width = 80;
+        const height = 24;
+
+        let animationId;
+
+        const fusionPattern = [
+            "oooooooooo                      o8o                        ",
+            "`888'     `8                     `\"'                        ",
+            " 888          oooo  oooo   .oooo.o oooo   .ooooo.  ooo. .oo.",
+            " 888oooo8     `888  `888  d88(  \"8 `888  d88' `88b `888P\"Y88b",
+            " 888    \"      888   888  `\"Y88b.   888  888   888  888   888",
+            " 888           888   888  o.  )88b  888  888   888  888   888",
+            "o888o          `V88V\"V8P' 8\"\"888P' o888o `Y8bod8P' o888o o888o"
+        ];
+
+        const fireworks = [];
+        const fireworkColors = ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'];
+
+        function createFirework() {
+            return {
+                x: Math.random() * width,
+                y: height,
+                explodeY: Math.random() * (height / 2),
+                particles: [],
+                state: 'rising',
+                color: fireworkColors[Math.floor(Math.random() * fireworkColors.length)]
+            };
+        }
+
+        function updateFireworks(time) {
+            if (Math.random() < 0.02) {
+                fireworks.push(createFirework());
+            }
+
+            fireworks.forEach((firework, index) => {
+                if (firework.state === 'rising') {
+                    firework.y -= 0.2;
+                    if (firework.y <= firework.explodeY) {
+                        firework.state = 'exploding';
+                        for (let i = 0; i < 20; i++) {
+                            const angle = Math.random() * Math.PI * 2;
+                            const speed = Math.random() * 2 + 1;
+                            firework.particles.push({
+                                x: firework.x,
+                                y: firework.y,
+                                vx: Math.cos(angle) * speed,
+                                vy: Math.sin(angle) * speed,
+                                life: 30 + Math.random() * 30
+                            });
+                        }
+                    }
+                } else if (firework.state === 'exploding') {
+                    firework.particles.forEach(particle => {
+                        particle.x += particle.vx;
+                        particle.y += particle.vy;
+                        particle.vy += 0.05;
+                        particle.life--;
+                    });
+                    firework.particles = firework.particles.filter(particle => particle.life > 0);
+                    if (firework.particles.length === 0) {
+                        fireworks.splice(index, 1);
+                    }
+                }
+            });
+        }
+
+        function generateScene(time) {
+            const output = Array.from({ length: height }, () => Array(width).fill(' '));
+            const speed = speedControl.value;
+            const waveAmplitude = 2;
+            const waveFrequency = 0.1;
+
+            const offset = Math.floor(time * speed / 100) % width;
+
+            // Draw fireworks
+            updateFireworks(time);
+            fireworks.forEach(firework => {
+                if (firework.state === 'rising') {
+                    const x = Math.floor(firework.x);
+                    const y = Math.floor(firework.y);
+                    if (y >= 0 && y < height && x >= 0 && x < width) {
+                        output[y][x] = `<span class="firework" style="color:${firework.color}">|</span>`;
+                    }
+                } else if (firework.state === 'exploding') {
+                    firework.particles.forEach(particle => {
+                        const x = Math.floor(particle.x);
+                        const y = Math.floor(particle.y);
+                        if (y >= 0 && y < height && x >= 0 && x < width) {
+                            output[y][x] = `<span class="firework" style="color:${firework.color}">*</span>`;
+                        }
+                    });
+                }
+            });
+
+            // Draw fusion pattern
+            for (let y = 0; y < fusionPattern.length; y++) {
+                for (let x = 0; x < width; x++) {
+                    const patternX = (x + offset) % width;
+                    
+                    // Apply wave effect
+                    const waveY = Math.sin((x + time * 0.01) * waveFrequency) * waveAmplitude;
+                    const yPos = Math.floor(y + waveY + (height - fusionPattern.length) / 2);
+                    
+                    if (yPos >= 0 && yPos < height && x >= 0 && x < width) {
+                        output[yPos][x] = fusionPattern[y][patternX] || ' ';
+                    }
+                }
+            }
+
+            return output.map(row => row.join('')).join('\n');
+        }
+
+        function updateScene(time) {
+            sceneElement.innerHTML = generateScene(time);
+            animationId = requestAnimationFrame(updateScene);
+        }
+
+        function updateZoom() {
+            sceneElement.style.fontSize = `${zoomControl.value}px`;
+        }
+
+        zoomControl.addEventListener('input', updateZoom);
+        speedControl.addEventListener('input', () => {
+            cancelAnimationFrame(animationId);
+            animationId = requestAnimationFrame(updateScene);
+        });
+
+        // Setup
+        document.addEventListener('DOMContentLoaded', () => {
+            updateZoom();
+            animationId = requestAnimationFrame(updateScene);
+        });
+    </script>
+</body>
+</html>

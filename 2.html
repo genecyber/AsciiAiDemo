@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fiery 3D ASCII Dragon Tunnel</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+            perspective: 1000px;
+            overflow: hidden;
+        }
+        #scene {
+            font-size: 10px;
+            line-height: 1;
+            white-space: pre;
+            transform-style: preserve-3d;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            gap: 20px;
+            color: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div id="scene"></div>
+    <div id="controls">
+        <div>
+            <label for="zoom">Zoom:</label>
+            <input type="range" id="zoom" min="6" max="16" value="10" step="1">
+        </div>
+        <div>
+            <label for="speed">Speed:</label>
+            <input type="range" id="speed" min="1" max="10" value="5" step="1">
+        </div>
+        <div>
+            <label for="complexity">Complexity:</label>
+            <input type="range" id="complexity" min="1" max="5" value="3" step="1">
+        </div>
+        <div>
+            <label for="depth">Depth:</label>
+            <input type="range" id="depth" min="1" max="10" value="5" step="1">
+        </div>
+    </div>
+    <script>
+        const sceneElement = document.getElementById('scene');
+        const zoomControl = document.getElementById('zoom');
+        const speedControl = document.getElementById('speed');
+        const complexityControl = document.getElementById('complexity');
+        const depthControl = document.getElementById('depth');
+
+        const width = 120;
+        const height = 40;
+        const baseDepth = 32;
+        const fireChars = '🔥@#*+=:-. ';
+        const fov = 90;
+
+        let time = 0;
+        let embers = [];
+
+        function createEmber() {
+            return {
+                x: (Math.random() - 0.5) * width,
+                y: (Math.random() - 0.5) * height,
+                z: baseDepth,
+                color: `hsl(${Math.random() * 60 + 10}, 100%, 50%)`,
+                size: Math.random() * 2 + 1
+            };
+        }
+
+        function initEmbers() {
+            for (let i = 0; i < 100; i++) {
+                embers.push(createEmber());
+            }
+        }
+
+        function updateEmbers() {
+            const speed = speedControl.value / 5;
+            embers.forEach(ember => {
+                ember.z -= speed * 1.5;
+                ember.y += (Math.random() - 0.5) * 0.5;
+                ember.x += (Math.random() - 0.5) * 0.5;
+                if (ember.z < 1) {
+                    Object.assign(ember, createEmber());
+                }
+            });
+        }
+
+        function fireNoise(x, y, z, octaves) {
+            let noise = 0;
+            let frequency = 1;
+            let amplitude = 1;
+            let maxValue = 0;
+            for (let i = 0; i < octaves; i++) {
+                noise += (Math.sin(x * frequency + time * 2) * Math.cos(y * frequency + time * 2) * Math.sin(z * frequency + time * 2) +
+                          Math.sin(x * frequency * 1.5 + time * 2.2) * Math.cos(y * frequency * 1.5 + time * 2.2) * Math.sin(z * frequency * 1.5 + time * 2.2)) * amplitude;
+                maxValue += amplitude;
+                amplitude *= 0.5;
+                frequency *= 2;
+            }
+            return noise / maxValue;
+        }
+
+        function smoothStep(edge0, edge1, x) {
+            const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+            return t * t * (3 - 2 * t);
+        }
+
+        function fireShape(angle, distance, timeOffset) {
+            const flameFlicker = Math.sin(time * 0.5 + timeOffset) * 0.3 + 0.7;
+            const flameWave = Math.sin(angle * 4 + time * 0.6 + timeOffset) * 0.2 + 0.8;
+            const flameTip = Math.pow(1 - Math.abs(angle) / Math.PI, 2) * 0.5 + 0.5;
+            return flameFlicker * flameWave * flameTip;
+        }
+
+        function generateScene() {
+            let scene = Array(height).fill().map(() => Array(width).fill({ char: ' ', color: 'black', luminosity: 0, z: 0 }));
+            const complexity = complexityControl.value;
+            const depthFactor = depthControl.value / 5;
+            const depth = baseDepth * depthFactor;
+
+            for (let x = 0; x < width; x++) {
+                for (let y = 0; y < height; y++) {
+                    const dx = x - width / 2;
+                    const dy = y - height / 2;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const angle = Math.atan2(dy, dx);
+                    
+                    const shapeDistortion = fireShape(angle, distance, time * 0.2);
+                    const distortedDistance = distance * shapeDistortion;
+
+                    const noise = fireNoise(dx / 15, dy / 15, time / 5, complexity);
+                    const z = smoothStep(0, 1, (noise + 1) / 2) * depth;
+                    const perspectiveFactor = Math.pow(Math.cos(distortedDistance / (width / 2) * Math.PI / 2), 2);
+                    
+                    const brightness = smoothStep(0, 1, (1 - z / depth) * perspectiveFactor);
+                    const charIndex = Math.floor(brightness * (fireChars.length - 1));
+                    const char = fireChars[Math.max(0, Math.min(charIndex, fireChars.length - 1))];
+
+                    const projectedX = Math.floor(width / 2 + dx * perspectiveFactor);
+                    const projectedY = Math.floor(height / 2 + dy * perspectiveFactor);
+
+                    if (projectedX >= 0 && projectedX < width && projectedY >= 0 && projectedY < height) {
+                        const hue = 30 - brightness * 30;
+                        const saturation = 100;
+                        const luminosity = 50 + brightness * 50;
+                        scene[projectedY][projectedX] = { 
+                            char, 
+                            color: `hsl(${hue}, ${saturation}%, ${luminosity}%)`,
+                            luminosity: brightness,
+                            z: z
+                        };
+                    }
+                }
+            }
+
+            // Draw embers
+            embers.forEach(ember => {
+                const perspectiveFactor = fov / (fov + ember.z);
+                const projectedX = Math.floor(width / 2 + ember.x * perspectiveFactor);
+                const projectedY = Math.floor(height / 2 + ember.y * perspectiveFactor);
+
+                if (projectedX >= 0 && projectedX < width && projectedY >= 0 && projectedY < height) {
+                    const brightness = 1 - ember.z / depth;
+                    const emberChar = '•';
+                    const luminosity = brightness * 100;
+                    scene[projectedY][projectedX] = { 
+                        char: emberChar, 
+                        color: ember.color,
+                        luminosity: brightness,
+                        z: ember.z
+                    };
+                }
+            });
+
+            return scene.map((row, y) => 
+                row.map((pixel, x) => {
+                    const zOffset = pixel.z / 10;
+                    return `<span style="color:${pixel.color};text-shadow:0 0 ${pixel.luminosity * 5}px ${pixel.color};transform:translateZ(${zOffset}px)">${pixel.char}</span>`;
+                }).join('')
+            ).join('\n');
+        }
+
+        function updateScene() {
+            time += 0.1 * speedControl.value / 5;
+            updateEmbers();
+            sceneElement.innerHTML = generateScene();
+            sceneElement.style.transform = `rotateX(${Math.sin(time * 0.1) * 5}deg) rotateY(${Math.cos(time * 0.1) * 5}deg)`;
+            requestAnimationFrame(updateScene);
+        }
+
+        function updateZoom() {
+            sceneElement.style.fontSize = `${zoomControl.value}px`;
+        }
+
+        zoomControl.addEventListener('input', updateZoom);
+        speedControl.addEventListener('input', () => {});
+        complexityControl.addEventListener('input', () => {});
+        depthControl.addEventListener('input', () => {});
+
+        initEmbers();
+        updateZoom();
+        updateScene();
+    </script>
+</body>
+</html>

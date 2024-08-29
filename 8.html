@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Thermal Imaging of a Flame</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+            overflow: hidden;
+        }
+        #scene {
+            font-size: 10px;
+            line-height: 1;
+            white-space: pre;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            gap: 20px;
+            color: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div id="scene"></div>
+    <div id="controls">
+        <div>
+            <label for="zoom">Zoom:</label>
+            <input type="range" id="zoom" min="6" max="16" value="10" step="1">
+        </div>
+        <div>
+            <label for="intensity">Intensity:</label>
+            <input type="range" id="intensity" min="1" max="10" value="5" step="1">
+        </div>
+        <div>
+            <label for="flicker">Flicker:</label>
+            <input type="range" id="flicker" min="1" max="10" value="5" step="1">
+        </div>
+    </div>
+    <script>
+        const sceneElement = document.getElementById('scene');
+        const zoomControl = document.getElementById('zoom');
+        const intensityControl = document.getElementById('intensity');
+        const flickerControl = document.getElementById('flicker');
+
+        const width = 80;
+        const height = 40;
+        const thermalChars = ' .:-=+*#%@';
+
+        let time = 0;
+
+        function noise(x, y, t) {
+            return Math.sin(x * 0.1 + t) * Math.cos(y * 0.1 - t) * Math.sin(t);
+        }
+
+        function generateFlame(x, y, t, intensity, flicker) {
+            const distanceFromCenter = Math.sqrt(Math.pow(x - width / 2, 2) + Math.pow(y - height, 2));
+            const baseIntensity = Math.max(0, 1 - distanceFromCenter / (height * 0.8));
+            const flickerNoise = noise(x, y, t) * flicker * 0.2;
+            return Math.min(1, Math.max(0, baseIntensity * intensity + flickerNoise));
+        }
+
+        function generateScene() {
+            const intensity = intensityControl.value / 5;
+            const flicker = flickerControl.value / 5;
+            let scene = '';
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const flameIntensity = generateFlame(x, y, time, intensity, flicker);
+                    const charIndex = Math.floor(flameIntensity * (thermalChars.length - 1));
+                    const char = thermalChars[charIndex];
+                    
+                    // Generate color based on intensity (blue for cold, red for hot)
+                    const hue = 240 - flameIntensity * 240;
+                    const saturation = 100;
+                    const lightness = 20 + flameIntensity * 60;
+                    
+                    scene += `<span style="color:hsl(${hue},${saturation}%,${lightness}%)">${char}</span>`;
+                }
+                scene += '\n';
+            }
+
+            return scene;
+        }
+
+        function updateScene() {
+            time += 0.1;
+            sceneElement.innerHTML = generateScene();
+            requestAnimationFrame(updateScene);
+        }
+
+        function updateZoom() {
+            sceneElement.style.fontSize = `${zoomControl.value}px`;
+        }
+
+        zoomControl.addEventListener('input', updateZoom);
+        intensityControl.addEventListener('input', () => {});
+        flickerControl.addEventListener('input', () => {});
+
+        updateZoom();
+        updateScene();
+    </script>
+</body>
+</html>

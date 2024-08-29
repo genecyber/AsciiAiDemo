@@ -1,0 +1,152 @@
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        background-color: #000000;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        font-family: monospace;
+        color: #FFFFFF;
+        overflow: hidden;
+    }
+    #animation-container {
+        width: 100%;
+        height: 90%;
+        border: 1px solid #333;
+        margin-bottom: 20px;
+    }
+    #controls {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    #controls a {
+        text-decoration: none;
+        font-size: 18px;
+        color: #FFFFFF;
+        padding: 10px 20px;
+        background-color: #333;
+        border-radius: 5px;
+        transition: background-color 0.3s;
+    }
+    #controls a:hover {
+        background-color: #555;
+    }
+    #animation-viewer {
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+    #animation-container {
+        flex: 1;
+        width: 100%;
+        border: 1px solid #333;
+        margin-bottom: 20px;
+    }
+    #animation-select {
+        background-color: #333;
+        color: #FFFFFF;
+        padding: 10px;
+        font-size: 18px;
+        border: none;
+        border-radius: 5px;
+    }
+</style>
+
+<div id="animation-viewer">
+    <iframe id="animation-container" src="" frameborder="0"></iframe>
+    <div id="controls">
+        <a href="#" id="prev-btn">&lt; Previous</a>
+        <select id="animation-select"></select>
+        <a href="#" id="next-btn">Next &gt;</a>
+    </div>
+</div>
+
+<script>
+    const animations = [
+        '1.html',
+        '2.html',
+        '3.html',
+        '4.html',
+        '5.html',
+        '6.html',
+        '7.html',
+        '8.html',
+        '9.html',
+        '10.html',
+        '11.html',
+        '12.html',
+        '13.html',
+        '14.html',
+        '15.html',
+        '16.html',
+        '17.html',
+        '18.html',
+        '19.html',
+        '20.html',
+        '21.html',
+        '22.html',
+        '23.html',
+        '24.html',
+        '25.html',
+        '26.html',
+    ];
+    let currentIndex = 0;
+
+    const iframe = document.getElementById('animation-container');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const selectElement = document.getElementById('animation-select');
+
+    function loadAnimation(index) {
+        iframe.src = animations[index];
+        selectElement.selectedIndex = index;
+    }
+
+    function updateButtons() {
+        prevBtn.style.visibility = currentIndex > 0 ? 'visible' : 'hidden';
+        nextBtn.style.visibility = currentIndex < animations.length - 1 ? 'visible' : 'hidden';
+    }
+
+    // Populate select element
+    animations.forEach((animation, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = `Animation ${index + 1}`;
+        selectElement.appendChild(option);
+    });
+
+    prevBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (currentIndex > 0) {
+            currentIndex--;
+            loadAnimation(currentIndex);
+            updateButtons();
+        }
+    });
+
+    nextBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (currentIndex < animations.length - 1) {
+            currentIndex++;
+            loadAnimation(currentIndex);
+            updateButtons();
+        }
+    });
+
+    selectElement.addEventListener('change', (e) => {
+        currentIndex = parseInt(e.target.value);
+        loadAnimation(currentIndex);
+        updateButtons();
+    });
+
+    // Load the first animation
+    loadAnimation(currentIndex);
+    updateButtons();
+</script>

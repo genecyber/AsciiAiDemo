@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Thermal Imaging of Disney Fireworks</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+            overflow: hidden;
+        }
+        #scene {
+            font-size: 10px;
+            line-height: 1;
+            white-space: pre;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            gap: 20px;
+            color: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div id="scene"></div>
+    <div id="controls">
+        <div>
+            <label for="zoom">Zoom:</label>
+            <input type="range" id="zoom" min="6" max="16" value="10" step="1">
+        </div>
+        <div>
+            <label for="intensity">Intensity:</label>
+            <input type="range" id="intensity" min="1" max="10" value="5" step="1">
+        </div>
+        <div>
+            <label for="frequency">Frequency:</label>
+            <input type="range" id="frequency" min="1" max="10" value="5" step="1">
+        </div>
+    </div>
+    <script>
+        const sceneElement = document.getElementById('scene');
+        const zoomControl = document.getElementById('zoom');
+        const intensityControl = document.getElementById('intensity');
+        const frequencyControl = document.getElementById('frequency');
+
+        const width = 120;
+        const height = 40;
+        const thermalChars = ' .:-=+*#%@';
+
+        let time = 0;
+        let fireworks = [];
+
+        function noise(x, y, t) {
+            return Math.sin(x * 0.1 + t) * Math.cos(y * 0.1 - t) * Math.sin(t);
+        }
+
+        function createFirework() {
+            return {
+                x: Math.random() * width,
+                y: height,
+                explodeY: Math.random() * height * 0.7,
+                particles: [],
+                exploded: false,
+                color: Math.random() * 360
+            };
+        }
+
+        function updateFireworks() {
+            const frequency = frequencyControl.value / 5;
+            if (Math.random() < 0.05 * frequency && fireworks.length < 5) {
+                fireworks.push(createFirework());
+            }
+
+            fireworks = fireworks.filter(fw => {
+                if (!fw.exploded) {
+                    fw.y -= 0.5;
+                    if (fw.y <= fw.explodeY) {
+                        fw.exploded = true;
+                        for (let i = 0; i < 50; i++) {
+                            const angle = Math.random() * Math.PI * 2;
+                            const speed = Math.random() * 2 + 1;
+                            fw.particles.push({
+                                x: fw.x,
+                                y: fw.y,
+                                vx: Math.cos(angle) * speed,
+                                vy: Math.sin(angle) * speed,
+                                life: 1
+                            });
+                        }
+                    }
+                } else {
+                    fw.particles = fw.particles.filter(p => {
+                        p.x += p.vx;
+                        p.y += p.vy;
+                        p.vy += 0.05; // gravity
+                        p.life -= 0.02;
+                        return p.life > 0;
+                    });
+                    return fw.particles.length > 0;
+                }
+                return true;
+            });
+        }
+
+        function generateScene() {
+            const intensity = intensityControl.value / 5;
+            let scene = Array(height).fill().map(() => Array(width).fill(0));
+
+            fireworks.forEach(fw => {
+                if (!fw.exploded) {
+                    const x = Math.floor(fw.x);
+                    const y = Math.floor(fw.y);
+                    if (x >= 0 && x < width && y >= 0 && y < height) {
+                        scene[y][x] = Math.max(scene[y][x], intensity);
+                    }
+                } else {
+                    fw.particles.forEach(p => {
+                        const x = Math.floor(p.x);
+                        const y = Math.floor(p.y);
+                        if (x >= 0 && x < width && y >= 0 && y < height) {
+                            scene[y][x] = Math.max(scene[y][x], p.life * intensity);
+                        }
+                    });
+                }
+            });
+
+            return scene.map(row => 
+                row.map(intensity => {
+                    const charIndex = Math.floor(intensity * (thermalChars.length - 1));
+                    const char = thermalChars[charIndex];
+                    const hue = (intensity * 120) % 360; // cycle through colors
+                    const saturation = 100;
+                    const lightness = 50;
+                    return `<span style="color:hsl(${hue},${saturation}%,${lightness}%)">${char}</span>`;
+                }).join('')
+            ).join('\n');
+        }
+
+        function updateScene() {
+            time += 0.1;
+            updateFireworks();
+            sceneElement.innerHTML = generateScene();
+            requestAnimationFrame(updateScene);
+        }
+
+        function updateZoom() {
+            sceneElement.style.fontSize = `${zoomControl.value}px`;
+        }
+
+        zoomControl.addEventListener('input', updateZoom);
+        intensityControl.addEventListener('input', () => {});
+        frequencyControl.addEventListener('input', () => {});
+
+        updateZoom();
+        updateScene();
+    </script>
+</body>
+</html>

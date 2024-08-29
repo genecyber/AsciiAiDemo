@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Rotating ASCII Cube</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+            overflow: hidden;
+        }
+        #scene {
+            font-size: 10px;
+            line-height: 1;
+            white-space: pre;
+            color: #FFFFFF;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            gap: 20px;
+            color: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div id="scene"></div>
+    <div id="controls">
+        <div>
+            <label for="zoom">Zoom:</label>
+            <input type="range" id="zoom" min="6" max="16" value="10" step="1">
+        </div>
+        <div>
+            <label for="speed">Speed:</label>
+            <input type="range" id="speed" min="1" max="10" value="5" step="1">
+        </div>
+    </div>
+    <script>
+        const sceneElement = document.getElementById('scene');
+        const zoomControl = document.getElementById('zoom');
+        const speedControl = document.getElementById('speed');
+
+        const width = 80;  // Increased from 60 to provide more horizontal space
+        const height = 50;  // Increased from 40 to provide more vertical space
+        const cubeSize = 14;  // Reduced from 16 to zoom out slightly
+
+        let time = 0;
+
+        function rotatePoint(x, y, z, angleX, angleY) {
+            // Rotate around Y-axis
+            let tempX = x * Math.cos(angleY) - z * Math.sin(angleY);
+            let tempZ = x * Math.sin(angleY) + z * Math.cos(angleY);
+            
+            // Rotate around X-axis
+            let tempY = y * Math.cos(angleX) - tempZ * Math.sin(angleX);
+            tempZ = y * Math.sin(angleX) + tempZ * Math.cos(angleX);
+            
+            return [tempX, tempY, tempZ];
+        }
+
+        function generateScene() {
+            let scene = Array(height).fill().map(() => Array(width).fill(' '));
+            const speed = speedControl.value / 500;
+            const angleX = time * speed;
+            const angleY = time * speed * 0.7;
+
+            const cubeVertices = [
+                [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
+                [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]
+            ].map(v => v.map(coord => coord * cubeSize / 20)); // Scale vertices
+
+            const edges = [
+                [0, 1], [1, 2], [2, 3], [3, 0],
+                [4, 5], [5, 6], [6, 7], [7, 4],
+                [0, 4], [1, 5], [2, 6], [3, 7]
+            ];
+
+            const rotatedVertices = cubeVertices.map(v => rotatePoint(v[0], v[1], v[2], angleX, angleY));
+
+            edges.forEach(edge => {
+                const [x1, y1, z1] = rotatedVertices[edge[0]];
+                const [x2, y2, z2] = rotatedVertices[edge[1]];
+
+                const steps = 100;
+                for (let i = 0; i <= steps; i++) {
+                    const t = i / steps;
+                    const x = x1 + (x2 - x1) * t;
+                    const y = y1 + (y2 - y1) * t;
+                    const z = z1 + (z2 - z1) * t;
+
+                    const projX = Math.floor((x + 1) / 2 * width);
+                    const projY = Math.floor((y + 1) / 2 * height);
+
+                    if (projX >= 0 && projX < width && projY >= 0 && projY < height) {
+                        const depth = (z + 1) / 2;
+                        const char = depth > 0.7 ? '@' : depth > 0.3 ? '#' : '.';
+                        scene[projY][projX] = char;
+                    }
+                }
+            });
+
+            return scene.map(row => row.join('')).join('\n');
+        }
+
+        function updateScene() {
+            time += 0.1;
+            sceneElement.textContent = generateScene();
+            requestAnimationFrame(updateScene);
+        }
+
+        function updateZoom() {
+            sceneElement.style.fontSize = `${zoomControl.value}px`;
+        }
+
+        zoomControl.addEventListener('input', updateZoom);
+        speedControl.addEventListener('input', () => {});
+
+        updateZoom();
+        updateScene();
+    </script>
+</body>
+</html>

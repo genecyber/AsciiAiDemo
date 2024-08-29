@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smoky 3D ASCII Tunnel with Fire</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+            perspective: 1000px;
+            overflow: hidden;
+        }
+        #scene {
+            font-size: 10px;
+            line-height: 1;
+            white-space: pre;
+            transform-style: preserve-3d;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            gap: 20px;
+            color: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div id="scene"></div>
+    <div id="controls">
+        <div>
+            <label for="zoom">Zoom:</label>
+            <input type="range" id="zoom" min="6" max="16" value="10" step="1">
+        </div>
+        <div>
+            <label for="speed">Speed:</label>
+            <input type="range" id="speed" min="1" max="10" value="5" step="1">
+        </div>
+        <div>
+            <label for="complexity">Complexity:</label>
+            <input type="range" id="complexity" min="1" max="5" value="3" step="1">
+        </div>
+        <div>
+            <label for="depth">Depth:</label>
+            <input type="range" id="depth" min="1" max="10" value="5" step="1">
+        </div>
+    </div>
+    <script>
+        const sceneElement = document.getElementById('scene');
+        const zoomControl = document.getElementById('zoom');
+        const speedControl = document.getElementById('speed');
+        const complexityControl = document.getElementById('complexity');
+        const depthControl = document.getElementById('depth');
+
+        const width = 80;
+        const height = 40;
+        const baseDepth = 32;
+        const smokeChars = '░▒▓█@#*+=:-. ';
+        const fireChars = '🔥△▲▴▵';
+        const fov = 90;
+
+        let time = 0;
+        let smokeParticles = [];
+        let fireParticles = [];
+
+        function createSmokeParticle() {
+            return {
+                x: (Math.random() - 0.5) * width * 0.5,
+                y: (Math.random() - 0.5) * height * 0.5,
+                z: baseDepth,
+                opacity: Math.random() * 0.5 + 0.5,
+                size: Math.random() * 1.5 + 0.5
+            };
+        }
+
+        function createFireParticle() {
+            return {
+                x: (Math.random() - 0.5) * width * 0.3,
+                y: height * 0.4 + Math.random() * height * 0.2,
+                z: baseDepth * (0.8 + Math.random() * 0.2),
+                opacity: Math.random() * 0.7 + 0.3,
+                size: Math.random() * 1.2 + 0.8
+            };
+        }
+
+        function initParticles() {
+            for (let i = 0; i < 150; i++) {
+                smokeParticles.push(createSmokeParticle());
+            }
+            for (let i = 0; i < 30; i++) {
+                fireParticles.push(createFireParticle());
+            }
+        }
+
+        function updateParticles() {
+            const speed = speedControl.value / 5;
+            smokeParticles.forEach(particle => {
+                particle.z -= speed;
+                particle.y += (Math.random() - 0.5) * 0.3;
+                particle.x += (Math.random() - 0.5) * 0.3;
+                particle.opacity -= 0.005 * speed;
+                if (particle.z < 1 || particle.opacity <= 0) {
+                    Object.assign(particle, createSmokeParticle());
+                }
+            });
+            fireParticles.forEach(particle => {
+                particle.z -= speed * 1.5;
+                particle.y -= speed * 0.5;
+                particle.opacity -= 0.01 * speed;
+                if (particle.z < 1 || particle.opacity <= 0) {
+                    Object.assign(particle, createFireParticle());
+                }
+            });
+        }
+
+        function smokeNoise(x, y, z, octaves) {
+            let noise = 0;
+            let frequency = 1;
+            let amplitude = 1;
+            let maxValue = 0;
+            for (let i = 0; i < octaves; i++) {
+                noise += (Math.sin(x * frequency + time) * Math.cos(y * frequency + time) * Math.sin(z * frequency + time) +
+                          Math.sin(x * frequency * 1.5 + time * 1.1) * Math.cos(y * frequency * 1.5 + time * 1.1) * Math.sin(z * frequency * 1.5 + time * 1.1)) * amplitude;
+                maxValue += amplitude;
+                amplitude *= 0.5;
+                frequency *= 2;
+            }
+            return noise / maxValue;
+        }
+
+        function smoothStep(edge0, edge1, x) {
+            const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+            return t * t * (3 - 2 * t);
+        }
+
+        function smokeShape(angle, distance, timeOffset) {
+            const smokeWave = Math.sin(angle * 2 + time * 0.3 + timeOffset) * 0.2 + 0.8;
+            const smokeDrift = Math.sin(distance * 0.1 + time * 0.2 + timeOffset) * 0.3 + 0.7;
+            return smokeWave * smokeDrift;
+        }
+
+        function generateScene() {
+            let scene = Array(height).fill().map(() => Array(width).fill({ char: ' ', color: 'black', opacity: 0, z: 0 }));
+            const complexity = complexityControl.value;
+            const depthFactor = depthControl.value / 5;
+            const depth = baseDepth * depthFactor;
+
+            for (let x = 0; x < width; x++) {
+                for (let y = 0; y < height; y++) {
+                    const dx = x - width / 2;
+                    const dy = y - height / 2;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const angle = Math.atan2(dy, dx);
+                    
+                    const shapeDistortion = smokeShape(angle, distance, time * 0.1);
+                    const distortedDistance = distance * shapeDistortion;
+
+                    const noise = smokeNoise(dx / 10, dy / 10, time / 5, complexity);
+                    const z = smoothStep(0, 1, (noise + 1) / 2) * depth;
+                    const perspectiveFactor = Math.pow(Math.cos(distortedDistance / (width / 2) * Math.PI / 2), 2);
+                    
+                    const opacity = smoothStep(0, 1, (1 - z / depth) * perspectiveFactor) * 0.8;
+                    const charIndex = Math.floor(opacity * (smokeChars.length - 1));
+                    const char = smokeChars[Math.max(0, Math.min(charIndex, smokeChars.length - 1))];
+
+                    const projectedX = Math.floor(width / 2 + dx * perspectiveFactor);
+                    const projectedY = Math.floor(height / 2 + dy * perspectiveFactor);
+
+                    if (projectedX >= 0 && projectedX < width && projectedY >= 0 && projectedY < height) {
+                        const grayValue = Math.floor(255 * (1 - opacity));
+                        scene[projectedY][projectedX] = { 
+                            char, 
+                            color: `rgb(${grayValue},${grayValue},${grayValue})`,
+                            opacity: opacity,
+                            z: z
+                        };
+                    }
+                }
+            }
+
+            // Draw smoke particles
+            smokeParticles.forEach(particle => {
+                const perspectiveFactor = fov / (fov + particle.z);
+                const projectedX = Math.floor(width / 2 + particle.x * perspectiveFactor);
+                const projectedY = Math.floor(height / 2 + particle.y * perspectiveFactor);
+
+                if (projectedX >= 0 && projectedX < width && projectedY >= 0 && projectedY < height) {
+                    const opacity = particle.opacity * (1 - particle.z / depth);
+                    const grayValue = Math.floor(255 * (1 - opacity));
+                    const particleChar = '•';
+                    scene[projectedY][projectedX] = { 
+                        char: particleChar, 
+                        color: `rgb(${grayValue},${grayValue},${grayValue})`,
+                        opacity: opacity,
+                        z: particle.z
+                    };
+                }
+            });
+
+            // Draw fire particles
+            fireParticles.forEach(particle => {
+                const perspectiveFactor = fov / (fov + particle.z);
+                const projectedX = Math.floor(width / 2 + particle.x * perspectiveFactor);
+                const projectedY = Math.floor(height / 2 + particle.y * perspectiveFactor);
+
+                if (projectedX >= 0 && projectedX < width && projectedY >= 0 && projectedY < height) {
+                    const opacity = particle.opacity * (1 - particle.z / depth);
+                    const fireChar = fireChars[Math.floor(Math.random() * fireChars.length)];
+                    const hue = 20 + Math.random() * 40;
+                    const saturation = 80 + Math.random() * 20;
+                    const lightness = 50 + Math.random() * 30;
+                    scene[projectedY][projectedX] = { 
+                        char: fireChar, 
+                        color: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+                        opacity: opacity,
+                        z: particle.z
+                    };
+                }
+            });
+
+            return scene.map((row, y) => 
+                row.map((pixel, x) => {
+                    const zOffset = pixel.z / 10;
+                    return `<span style="color:${pixel.color};opacity:${pixel.opacity};transform:translateZ(${zOffset}px)">${pixel.char}</span>`;
+                }).join('')
+            ).join('\n');
+        }
+
+        function updateScene() {
+            time += 0.05 * speedControl.value / 5;
+            updateParticles();
+            sceneElement.innerHTML = generateScene();
+            sceneElement.style.transform = `rotateX(${Math.sin(time * 0.1) * 3}deg) rotateY(${Math.cos(time * 0.1) * 3}deg)`;
+            requestAnimationFrame(updateScene);
+        }
+
+        function updateZoom() {
+            sceneElement.style.fontSize = `${zoomControl.value}px`;
+        }
+
+        zoomControl.addEventListener('input', updateZoom);
+        speedControl.addEventListener('input', () => {});
+        complexityControl.addEventListener('input', () => {});
+        depthControl.addEventListener('input', () => {});
+
+        initParticles();
+        updateZoom();
+        updateScene();
+    </script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Wave Visualizer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+            overflow: hidden;
+        }
+        #scene {
+            font-size: 10px;
+            line-height: 1;
+            white-space: pre;
+            color: #FFFFFF;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            gap: 20px;
+            color: #FFFFFF;
+        }
+        #startButton {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div id="scene"></div>
+    <div id="controls">
+        <div>
+            <label for="zoom">Zoom:</label>
+            <input type="range" id="zoom" min="6" max="16" value="10" step="1">
+        </div>
+        <div>
+            <label for="frequency">Frequency:</label>
+            <input type="range" id="frequency" min="0.1" max="5" value="1" step="0.1">
+        </div>
+        <div>
+            <label for="waveType">Wave Type:</label>
+            <select id="waveType">
+                <option value="sine">Sine</option>
+                <option value="square">Square</option>
+                <option value="sawtooth">Sawtooth</option>
+                <option value="triangle">Triangle</option>
+            </select>
+        </div>
+        <button id="startButton">Start Animation</button>
+    </div>
+    <script>
+        const sceneElement = document.getElementById('scene');
+        const zoomControl = document.getElementById('zoom');
+        const frequencyControl = document.getElementById('frequency');
+        const waveTypeControl = document.getElementById('waveType');
+        const startButton = document.getElementById('startButton');
+
+        const width = 80;
+        const height = 24;
+
+        let isAnimationRunning = false;
+        let animationId;
+
+        function generateScene(time) {
+            const output = new Array(height).fill().map(() => new Array(width).fill(' '));
+            const asciiChars = ' .:-=+*#%@'.split('');
+
+            for (let x = 0; x < width; x++) {
+                let value;
+                const t = (x / width + time / 1000) * Math.PI * 2 * frequencyControl.value;
+
+                switch (waveTypeControl.value) {
+                    case 'sine':
+                        value = Math.sin(t);
+                        break;
+                    case 'square':
+                        value = Math.sign(Math.sin(t));
+                        break;
+                    case 'sawtooth':
+                        value = (t % (2 * Math.PI)) / Math.PI - 1;
+                        break;
+                    case 'triangle':
+                        value = Math.abs((t % (2 * Math.PI)) / Math.PI - 1) * 2 - 1;
+                        break;
+                }
+
+                const y = Math.floor((height / 2) + (value * height / 2));
+
+                if (y >= 0 && y < height) {
+                    const charIndex = Math.floor(Math.abs(value) * (asciiChars.length - 1));
+                    output[y][x] = asciiChars[charIndex];
+                }
+            }
+
+            return output.map(row => row.join('')).join('\n');
+        }
+
+        function updateScene(time) {
+            sceneElement.textContent = generateScene(time);
+            if (isAnimationRunning) {
+                animationId = requestAnimationFrame(updateScene);
+            }
+        }
+
+        function updateZoom() {
+            sceneElement.style.fontSize = `${zoomControl.value}px`;
+        }
+
+        zoomControl.addEventListener('input', updateZoom);
+        frequencyControl.addEventListener('input', updateScene);
+        waveTypeControl.addEventListener('change', updateScene);
+
+        startButton.addEventListener('click', () => {
+            if (!isAnimationRunning) {
+                isAnimationRunning = true;
+                startButton.textContent = 'Stop Animation';
+                animationId = requestAnimationFrame(updateScene);
+            } else {
+                isAnimationRunning = false;
+                startButton.textContent = 'Start Animation';
+                cancelAnimationFrame(animationId);
+            }
+        });
+
+        // Setup
+        document.addEventListener('DOMContentLoaded', () => {
+            updateZoom();
+            updateScene(0);
+        });
+    </script>
+</body>
+</html>

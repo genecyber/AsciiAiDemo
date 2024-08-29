@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced ASCII Fireworks Display with Shapes and Depth</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000011;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+        }
+        #scene {
+            color: #FFFFFF;
+            font-size: 10px;
+            line-height: 1;
+            white-space: pre;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            gap: 20px;
+            color: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div id="scene"></div>
+    <div id="controls">
+        <div>
+            <label for="zoom">Zoom:</label>
+            <input type="range" id="zoom" min="6" max="16" value="10" step="1">
+        </div>
+        <div>
+            <label for="frequency">Frequency:</label>
+            <input type="range" id="frequency" min="1" max="10" value="5" step="1">
+        </div>
+    </div>
+    <script>
+        const sceneElement = document.getElementById('scene');
+        const zoomControl = document.getElementById('zoom');
+        const frequencyControl = document.getElementById('frequency');
+
+        const width = 120;
+        const height = 60;
+        const particleChars = '.+*x#@';
+        const colors = ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFFFFF'];
+        const shapes = ['circle', 'heart', 'star', 'spiral'];
+
+        let fireworks = [];
+        let stars = Array(100).fill().map(() => ({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            brightness: Math.random()
+        }));
+
+        function createFirework() {
+            const x = Math.random() * width;
+            const y = height;
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            const depth = Math.random() * 0.7 + 0.3; // 0.3 to 1.0
+            const shape = shapes[Math.floor(Math.random() * shapes.length)];
+            const speed = Math.random() * 0.5 + 0.5; // 0.5 to 1.0
+            return { x, y, exploded: false, particles: [], color, depth, shape, speed };
+        }
+
+        function createParticles(fw) {
+            const particles = [];
+            const particleCount = Math.floor(50 * fw.depth);
+            
+            switch(fw.shape) {
+                case 'circle':
+                    for (let i = 0; i < particleCount; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const speed = (Math.random() * 2 + 1) * fw.depth * fw.speed;
+                        particles.push({
+                            x: fw.x, y: fw.y,
+                            vx: Math.cos(angle) * speed,
+                            vy: Math.sin(angle) * speed,
+                            life: 1
+                        });
+                    }
+                    break;
+                case 'heart':
+                    for (let i = 0; i < particleCount; i++) {
+                        const t = i / particleCount * Math.PI * 2;
+                        const x = 16 * Math.pow(Math.sin(t), 3);
+                        const y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+                        const speed = (Math.random() * 0.5 + 0.5) * fw.depth * fw.speed;
+                        particles.push({
+                            x: fw.x, y: fw.y,
+                            vx: x * speed * 0.05,
+                            vy: -y * speed * 0.05,
+                            life: 1
+                        });
+                    }
+                    break;
+                case 'star':
+                    for (let i = 0; i < particleCount; i++) {
+                        const angle = (i / particleCount) * Math.PI * 2;
+                        const radius = i % 2 === 0 ? 1 : 0.5;
+                        const speed = (Math.random() * 1.5 + 0.5) * fw.depth * fw.speed;
+                        particles.push({
+                            x: fw.x, y: fw.y,
+                            vx: Math.cos(angle) * radius * speed,
+                            vy: Math.sin(angle) * radius * speed,
+                            life: 1
+                        });
+                    }
+                    break;
+                case 'spiral':
+                    for (let i = 0; i < particleCount; i++) {
+                        const angle = (i / particleCount) * Math.PI * 10;
+                        const radius = (i / particleCount) * 2;
+                        const speed = (Math.random() * 1.5 + 0.5) * fw.depth * fw.speed;
+                        particles.push({
+                            x: fw.x, y: fw.y,
+                            vx: Math.cos(angle) * radius * speed,
+                            vy: Math.sin(angle) * radius * speed,
+                            life: 1
+                        });
+                    }
+                    break;
+            }
+            return particles;
+        }
+
+        function updateFireworks() {
+            fireworks = fireworks.filter(fw => fw.y > 0 || fw.particles.length > 0);
+
+            fireworks.forEach(fw => {
+                if (!fw.exploded) {
+                    fw.y -= 0.5 * fw.depth * fw.speed;
+                    if (fw.y < height * (0.3 + Math.random() * 0.4)) {
+                        fw.exploded = true;
+                        fw.particles = createParticles(fw);
+                    }
+                } else {
+                    fw.particles.forEach(p => {
+                        p.x += p.vx;
+                        p.y += p.vy;
+                        p.vy += 0.03 * fw.depth; // gravity
+                        p.life -= 0.01 * fw.depth;
+                    });
+                    fw.particles = fw.particles.filter(p => p.life > 0);
+                }
+            });
+
+            if (Math.random() < 0.05 * frequencyControl.value / 5) {
+                fireworks.push(createFirework());
+            }
+
+            // Update stars
+            stars.forEach(star => {
+                star.y = (star.y + 0.01) % height;
+                star.brightness = (Math.sin(Date.now() / 1000 + star.x) + 1) / 2;
+            });
+        }
+
+        function generateScene() {
+            let scene = Array(height).fill().map(() => Array(width).fill(' '));
+
+            // Render stars
+            stars.forEach(star => {
+                const x = Math.floor(star.x);
+                const y = Math.floor(star.y);
+                const brightness = Math.floor(star.brightness * 255);
+                scene[y][x] = `<span style="color:#FFFFFF${brightness.toString(16).padStart(2, '0')}">.</span>`;
+            });
+
+            fireworks.sort((a, b) => a.depth - b.depth); // Render far to near
+
+            fireworks.forEach(fw => {
+                const size = Math.ceil(fw.depth * 2);
+                const brightness = Math.floor(fw.depth * 255);
+                const colorWithOpacity = fw.color + brightness.toString(16).padStart(2, '0');
+
+                if (!fw.exploded) {
+                    const x = Math.floor(fw.x);
+                    const y = Math.floor(fw.y);
+                    if (y >= 0 && y < height) {
+                        for (let i = 0; i < size; i++) {
+                            if (y + i < height) {
+                                scene[y + i][x] = `<span style="color:${colorWithOpacity}">|</span>`;
+                            }
+                        }
+                    }
+                } else {
+                    fw.particles.forEach(p => {
+                        const x = Math.floor(p.x);
+                        const y = Math.floor(p.y);
+                        if (x >= 0 && x < width && y >= 0 && y < height) {
+                            const char = particleChars[Math.floor(p.life * (particleChars.length - 1))];
+                            for (let dy = 0; dy < size; dy++) {
+                                for (let dx = 0; dx < size; dx++) {
+                                    if (y + dy < height && x + dx < width) {
+                                        scene[y + dy][x + dx] = `<span style="color:${colorWithOpacity}">${char}</span>`;
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+
+            return scene.map(row => row.join('')).join('\n');
+        }
+
+        function updateScene() {
+            updateFireworks();
+            sceneElement.innerHTML = generateScene();
+            requestAnimationFrame(updateScene);
+        }
+
+        function updateZoom() {
+            sceneElement.style.fontSize = `${zoomControl.value}px`;
+        }
+
+        zoomControl.addEventListener('input', updateZoom);
+        frequencyControl.addEventListener('input', () => {});
+
+        updateZoom();
+        updateScene();
+    </script>
+</body>
+</html>

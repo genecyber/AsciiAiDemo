@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Audio Waveform Visualizer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+            overflow: hidden;
+        }
+        #scene {
+            font-size: 10px;
+            line-height: 1;
+            white-space: pre;
+            color: #FFFFFF;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            gap: 20px;
+            color: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div id="scene"></div>
+    <div id="controls">
+        <div>
+            <label for="zoom">Zoom:</label>
+            <input type="range" id="zoom" min="6" max="16" value="10" step="1">
+        </div>
+        <div>
+            <label for="sensitivity">Sensitivity:</label>
+            <input type="range" id="sensitivity" min="1" max="10" value="5" step="1">
+        </div>
+    </div>
+    <script>
+        const sceneElement = document.getElementById('scene');
+        const zoomControl = document.getElementById('zoom');
+        const sensitivityControl = document.getElementById('sensitivity');
+
+        const width = 80;
+        const height = 24;
+
+        let audioContext;
+        let analyser;
+        let dataArray;
+
+        async function setupAudio() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                const source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+                analyser.fftSize = 256;
+                const bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+            }
+        }
+
+        function generateScene() {
+            const sensitivity = sensitivityControl.value / 5;
+            analyser.getByteTimeDomainData(dataArray);
+
+            const output = new Array(height).fill().map(() => new Array(width).fill(' '));
+            const asciiChars = ' .:-=+*#%@'.split('');
+
+            for (let x = 0; x < width; x++) {
+                const dataIndex = Math.floor((x / width) * dataArray.length);
+                const value = ((dataArray[dataIndex] / 128.0) - 1) * sensitivity;
+                const y = Math.floor((height / 2) + (value * height / 2));
+
+                if (y >= 0 && y < height) {
+                    const charIndex = Math.floor((Math.abs(value) / sensitivity) * (asciiChars.length - 1));
+                    output[y][x] = asciiChars[charIndex];
+                }
+            }
+
+            return output.map(row => row.join('')).join('\n');
+        }
+
+        function updateScene() {
+            if (audioContext && analyser) {
+                sceneElement.textContent = generateScene();
+            }
+            requestAnimationFrame(updateScene);
+        }
+
+        function updateZoom() {
+            sceneElement.style.fontSize = `${zoomControl.value}px`;
+        }
+
+        zoomControl.addEventListener('input', updateZoom);
+        sensitivityControl.addEventListener('input', () => {});
+
+        setupAudio().then(() => {
+            updateZoom();
+            updateScene();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Rotating ASCII Donut</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+            overflow: hidden;
+        }
+        #scene {
+            font-size: 10px;
+            line-height: 1;
+            white-space: pre;
+            color: #FFFFFF;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            gap: 20px;
+            color: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div id="scene"></div>
+    <div id="controls">
+        <div>
+            <label for="zoom">Zoom:</label>
+            <input type="range" id="zoom" min="6" max="16" value="10" step="1">
+        </div>
+        <div>
+            <label for="speed">Speed:</label>
+            <input type="range" id="speed" min="1" max="10" value="5" step="1">
+        </div>
+    </div>
+    <script>
+        const sceneElement = document.getElementById('scene');
+        const zoomControl = document.getElementById('zoom');
+        const speedControl = document.getElementById('speed');
+
+        const width = 80;
+        const height = 24;
+        const donutRadius = 1;
+        const tubeRadius = 0.5;
+
+        let A = 0, B = 0;
+
+        function generateScene() {
+            const speed = speedControl.value / 500;
+            A += speed;
+            B += speed * 0.7;
+
+            const output = new Array(height).fill().map(() => new Array(width).fill(' '));
+            const zBuffer = new Array(height).fill().map(() => new Array(width).fill(Infinity));
+
+            const cosA = Math.cos(A), sinA = Math.sin(A);
+            const cosB = Math.cos(B), sinB = Math.sin(B);
+
+            for (let theta = 0; theta < 2 * Math.PI; theta += 0.07) {
+                for (let phi = 0; phi < 2 * Math.PI; phi += 0.02) {
+                    const cosTheta = Math.cos(theta), sinTheta = Math.sin(theta);
+                    const cosPhi = Math.cos(phi), sinPhi = Math.sin(phi);
+
+                    const circleX = donutRadius + tubeRadius * cosTheta;
+                    const circleY = tubeRadius * sinTheta;
+
+                    const x = circleX * (cosB * cosPhi + sinA * sinB * sinPhi) - circleY * cosA * sinB;
+                    const y = circleX * (sinB * cosPhi - sinA * cosB * sinPhi) + circleY * cosA * cosB;
+                    const z = 5 + cosA * circleX * sinPhi + circleY * sinA;
+                    const ooz = 1 / z;
+
+                    const xp = Math.floor(width / 2 + 30 * ooz * x);
+                    const yp = Math.floor(height / 2 - 15 * ooz * y);
+
+                    if (xp >= 0 && xp < width && yp >= 0 && yp < height) {
+                        if (ooz < zBuffer[yp][xp]) {
+                            zBuffer[yp][xp] = ooz;
+                            const L = cosPhi * cosTheta * sinB - cosA * cosTheta * sinPhi -
+                                      sinA * sinTheta + cosB * (cosA * sinTheta - cosTheta * sinA * sinPhi);
+                            if (L > 0) {
+                                output[yp][xp] = ".,-~:;=!*#$@"[Math.floor(L * 8)];
+                            }
+                        }
+                    }
+                }
+            }
+
+            return output.map(row => row.join('')).join('\n');
+        }
+
+        function updateScene() {
+            sceneElement.textContent = generateScene();
+            requestAnimationFrame(updateScene);
+        }
+
+        function updateZoom() {
+            sceneElement.style.fontSize = `${zoomControl.value}px`;
+        }
+
+        zoomControl.addEventListener('input', updateZoom);
+        speedControl.addEventListener('input', () => {});
+
+        updateZoom();
+        updateScene();
+    </script>
+</body>
+</html>

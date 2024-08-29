@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animated ASCII Water Droplets on Window with Streaks and Drying</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #001020;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+        }
+        #scene {
+            color: #80C0FF;
+            font-size: 10px;
+            line-height: 1;
+            white-space: pre;
+            text-shadow: 0 0 5px #80C0FF;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            gap: 20px;
+            color: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div id="scene"></div>
+    <div id="controls">
+        <div>
+            <label for="zoom">Zoom:</label>
+            <input type="range" id="zoom" min="6" max="16" value="10" step="1">
+        </div>
+        <div>
+            <label for="intensity">Rain Intensity:</label>
+            <input type="range" id="intensity" min="1" max="10" value="5" step="1">
+        </div>
+    </div>
+    <script>
+        const sceneElement = document.getElementById('scene');
+        const zoomControl = document.getElementById('zoom');
+        const intensityControl = document.getElementById('intensity');
+
+        const width = 80;
+        const height = 40;
+        const dropletChars = '.oO@';
+        const streakChars = '│┃┆┇┊┋';
+
+        let droplets = [];
+        let streaks = [];
+
+        function createDroplet() {
+            return {
+                x: Math.random() * width,
+                y: 0,
+                size: Math.random() * 0.5 + 0.5,
+                speed: Math.random() * 0.2 + 0.1
+            };
+        }
+
+        function createStreak(x, y, size) {
+            return {
+                x: x,
+                y: y,
+                size: size,
+                length: 0,
+                maxLength: Math.random() * 10 + 5,
+                wetness: 1
+            };
+        }
+
+        function updateDroplets() {
+            droplets.forEach(droplet => {
+                droplet.y += droplet.speed;
+                droplet.x += (Math.random() - 0.5) * 0.1;
+                droplet.size += 0.01;
+
+                // Check for merging
+                droplets.forEach(otherDroplet => {
+                    if (droplet !== otherDroplet && 
+                        Math.abs(droplet.x - otherDroplet.x) < 1 && 
+                        Math.abs(droplet.y - otherDroplet.y) < 1) {
+                        droplet.size += otherDroplet.size * 0.5;
+                        droplet.speed += otherDroplet.speed * 0.2;
+                        droplets = droplets.filter(d => d !== otherDroplet);
+                    }
+                });
+
+                // Create streak when droplet is large enough
+                if (droplet.size > 1.5 && Math.random() < 0.1) {
+                    streaks.push(createStreak(droplet.x, droplet.y, droplet.size));
+                    droplets = droplets.filter(d => d !== droplet);
+                }
+            });
+
+            droplets = droplets.filter(droplet => droplet.y < height);
+
+            if (Math.random() < 0.1 * intensityControl.value / 5) {
+                droplets.push(createDroplet());
+            }
+        }
+
+        function updateStreaks() {
+            streaks.forEach(streak => {
+                if (streak.length < streak.maxLength) {
+                    streak.length += 0.2;
+                    streak.y += 0.2;
+                }
+                streak.wetness -= 0.001; // Drying effect
+            });
+
+            streaks = streaks.filter(streak => streak.wetness > 0);
+        }
+
+        function generateScene() {
+            let scene = Array(height).fill().map(() => Array(width).fill(' '));
+
+            // Render streaks
+            streaks.forEach(streak => {
+                const x = Math.floor(streak.x);
+                const startY = Math.floor(streak.y - streak.length);
+                const endY = Math.floor(streak.y);
+                for (let y = startY; y <= endY; y++) {
+                    if (x >= 0 && x < width && y >= 0 && y < height) {
+                        const charIndex = Math.min(Math.floor(streak.size), streakChars.length - 1);
+                        const char = streakChars[charIndex];
+                        const opacity = Math.floor(streak.wetness * 255);
+                        scene[y][x] = `<span style="color:#80C0FF${opacity.toString(16).padStart(2, '0')}">${char}</span>`;
+                    }
+                }
+            });
+
+            // Render droplets
+            droplets.forEach(droplet => {
+                const x = Math.floor(droplet.x);
+                const y = Math.floor(droplet.y);
+                if (x >= 0 && x < width && y >= 0 && y < height) {
+                    const charIndex = Math.min(Math.floor(droplet.size * dropletChars.length), dropletChars.length - 1);
+                    const char = dropletChars[charIndex];
+                    const opacity = Math.min(Math.floor(droplet.size * 255), 255);
+                    scene[y][x] = `<span style="color:#80C0FF${opacity.toString(16).padStart(2, '0')}">${char}</span>`;
+                }
+            });
+
+            // Add background "moisture" effect
+            for (let i = 0; i < width * height / 20; i++) {
+                const x = Math.floor(Math.random() * width);
+                const y = Math.floor(Math.random() * height);
+                if (scene[y][x] === ' ') {
+                    const opacity = Math.floor(Math.random() * 64);
+                    scene[y][x] = `<span style="color:#80C0FF${opacity.toString(16).padStart(2, '0')}">.</span>`;
+                }
+            }
+
+            return scene.map(row => row.join('')).join('\n');
+        }
+
+        function updateScene() {
+            updateDroplets();
+            updateStreaks();
+            sceneElement.innerHTML = generateScene();
+            requestAnimationFrame(updateScene);
+        }
+
+        function updateZoom() {
+            sceneElement.style.fontSize = `${zoomControl.value}px`;
+        }
+
+        zoomControl.addEventListener('input', updateZoom);
+        intensityControl.addEventListener('input', () => {});
+
+        updateZoom();
+        updateScene();
+    </script>
+</body>
+</html>
