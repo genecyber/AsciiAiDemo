@@ -19,6 +19,7 @@
             font-size: 10px;
             line-height: 1;
             white-space: pre;
+            transform: scaleY(-1);
         }
         #controls {
             position: absolute;
@@ -73,13 +74,13 @@
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
                     const normalizedX = (x - width / 2) / (width / 2);
-                    const normalizedY = (height - y) / height;
+                    const normalizedY = y / height;
                     
                     const flameBase = Math.max(0, 1 - Math.abs(normalizedX) * 2);
-                    const flameShape = Math.pow(normalizedY, 0.5) * flameBase;
+                    const flameShape = Math.pow(1 - normalizedY, 0.5) * flameBase;
                     
-                    const windEffect = Math.sin(y * 0.2 + time) * wind * normalizedY;
-                    const turbulence = flameSeed(x + windEffect * 10, y - time * 10, time) * 0.3;
+                    const windEffect = Math.sin(y * 0.2 + time) * wind * (1 - normalizedY);
+                    const turbulence = flameSeed(x + windEffect * 10, y + time * 10, time) * 0.3;
                     
                     const flameIntensity = Math.max(0, Math.min(1, flameShape + turbulence - 0.1));
                     scene[y][x] = flameIntensity * intensity;
