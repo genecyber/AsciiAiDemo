@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio-Responsive ASCII Thermal Imaging of a Flame</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+            overflow: hidden;
+        }
+        #scene {
+            font-size: 6px;
+            line-height: 1;
+            white-space: pre;
+            transform: perspective(1000px) rotateX(45deg);
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            gap: 20px;
+            color: #FFFFFF;
+        }
+        #audioControl {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px;
+            background-color: #333;
+            color: #FFF;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="scene"></div>
+    <div id="controls">
+        <div>
+            <label for="zoom">Zoom:</label>
+            <input type="range" id="zoom" min="3" max="10" value="6" step="1">
+        </div>
+        <div>
+            <label for="intensity">Intensity:</label>
+            <input type="range" id="intensity" min="1" max="10" value="5" step="1">
+        </div>
+        <div>
+            <label for="flicker">Flicker:</label>
+            <input type="range" id="flicker" min="1" max="10" value="5" step="1">
+        </div>
+        <div>
+            <label for="sensitivity">Sensitivity:</label>
+            <input type="range" id="sensitivity" min="1" max="10" value="5" step="1">
+        </div>
+    </div>
+    <button id="audioControl">Start Audio</button>
+    <script>
+        const sceneElement = document.getElementById('scene');
+        const zoomControl = document.getElementById('zoom');
+        const intensityControl = document.getElementById('intensity');
+        const flickerControl = document.getElementById('flicker');
+        const sensitivityControl = document.getElementById('sensitivity');
+        const audioControlButton = document.getElementById('audioControl');
+
+        const width = 80;  // Reduced by 50%
+        const height = 60; // Reduced by 50%
+        const thermalChars = ' .:-=+*#%@';
+
+        let time = 0;
+        let audioContext;
+        let analyser;
+        let dataArray;
+        let microphone;
+        let isAudioRunning = false;
+
+        async function initAudio() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+                microphone = audioContext.createMediaStreamSource(stream);
+                microphone.connect(analyser);
+
+                isAudioRunning = true;
+                audioControlButton.textContent = 'Stop Audio';
+                updateScene();
+            } catch (error) {
+                console.error('Error accessing microphone:', error);
+            }
+        }
+
+        function stopAudio() {
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+                analyser = null;
+                dataArray = null;
+                microphone = null;
+            }
+            isAudioRunning = false;
+            audioControlButton.textContent = 'Start Audio';
+        }
+
+        function toggleAudio() {
+            if (isAudioRunning) {
+                stopAudio();
+            } else {
+                initAudio();
+            }
+        }
+
+        function getAudioIntensity() {
+            if (!analyser || !dataArray) return 0;
+            analyser.getByteFrequencyData(dataArray);
+            const rawIntensity = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length / 255;
+            const sensitivity = sensitivityControl.value / 5;
+            return Math.pow(rawIntensity, sensitivity);
+        }
+
+        function noise(x, y, t, audioIntensity) {
+            return Math.sin(x * 0.1 + t * audioIntensity) * Math.cos(y * 0.1 - t * audioIntensity) * Math.sin(t * audioIntensity);
+        }
+
+        function generateFlame(x, y, t, intensity, flicker, audioIntensity) {
+            const distanceFromBottom = Math.sqrt(Math.pow(x - width / 2, 2) + Math.pow(y, 2));
+            const baseIntensity = Math.max(0, 1 - distanceFromBottom / height);
+            const flickerNoise = noise(x, y, t, audioIntensity) * flicker * 0.2;
+            const audioEffect = audioIntensity * 2; // Increased audio influence
+            const verticalShift = Math.sin(t * audioIntensity * 10) * 5; // Vertical movement based on audio
+            const horizontalShift = Math.cos(t * audioIntensity * 8) * 3; // Horizontal movement based on audio
+            const adjustedX = x + horizontalShift;
+            const adjustedY = y + verticalShift;
+            const adjustedDistanceFromBottom = Math.sqrt(Math.pow(adjustedX - width / 2, 2) + Math.pow(adjustedY, 2));
+            const adjustedBaseIntensity = Math.max(0, 1 - adjustedDistanceFromBottom / height);
+            return Math.min(1, Math.max(0, adjustedBaseIntensity * intensity + flickerNoise + audioEffect));
+        }
+
+        function generateScene() {
+            const intensity = intensityControl.value / 5;
+            const flicker = flickerControl.value / 5;
+            const audioIntensity = isAudioRunning ? getAudioIntensity() : 0;
+            let scene = '';
+
+            for (let y = height - 1; y >= 0; y--) {
+                for (let x = 0; x < width; x++) {
+                    const flameIntensity = generateFlame(x, y, time, intensity, flicker, audioIntensity);
+                    const charIndex = Math.floor(flameIntensity * (thermalChars.length - 1));
+                    const char = thermalChars[charIndex];
+                    
+                    const hue = 240 - flameIntensity * 240;
+                    const saturation = 100;
+                    const lightness = 20 + flameIntensity * 60;
+                    
+                    scene += `<span style="color:hsl(${hue},${saturation}%,${lightness}%)">${char}</span>`;
+                }
+                scene += '\n';
+            }
+
+            return scene;
+        }
+
+        function updateScene() {
+            time += 0.1;
+            sceneElement.innerHTML = generateScene();
+            requestAnimationFrame(updateScene);
+        }
+
+        function updateZoom() {
+            sceneElement.style.fontSize = `${zoomControl.value}px`;
+        }
+
+        zoomControl.addEventListener('input', updateZoom);
+        intensityControl.addEventListener('input', () => {});
+        flickerControl.addEventListener('input', () => {});
+        sensitivityControl.addEventListener('input', () => {});
+        audioControlButton.addEventListener('click', toggleAudio);
+
+        updateZoom();
+        updateScene();
+    </script>
+</body>
+</html>
